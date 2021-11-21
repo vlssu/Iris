@@ -3,8 +3,7 @@ package net.coderbot.iris.shadows;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.coderbot.iris.gl.framebuffer.GlFramebuffer;
 import net.coderbot.iris.gl.texture.InternalTextureFormat;
-import net.coderbot.iris.gl.texture.PixelFormat;
-import net.coderbot.iris.gl.texture.PixelType;
+import net.coderbot.iris.gl.texture.Texture2dCommands;
 import net.coderbot.iris.rendertarget.DepthTexture;
 import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL13C;
@@ -31,10 +30,12 @@ public class ShadowRenderTargets {
 					" but only " + MAX_SHADOW_RENDER_TARGETS + " are allowed.");
 		}
 
+		Texture2dCommands texture2dCommands = null;
+
 		int[] drawBuffers = new int[formats.length];
 
 		targets = new int[formats.length];
-		GL20C.glGenTextures(targets);
+		texture2dCommands.createHandles(targets);
 
 		depthTexture = new DepthTexture(resolution, resolution);
 		noTranslucents = new DepthTexture(resolution, resolution);
@@ -46,15 +47,17 @@ public class ShadowRenderTargets {
 		for (int i = 0; i < formats.length; i++) {
 			InternalTextureFormat format = formats[i];
 
-			RenderSystem.bindTexture(targets[i]);
+			// RenderSystem.bindTexture(targets[i]);
 
-			GL11C.glTexImage2D(GL11C.GL_TEXTURE_2D, 0, format.getGlFormat(), resolution, resolution, 0,
-					PixelFormat.RGBA.getGlFormat(), PixelType.UNSIGNED_BYTE.getGlFormat(), NULL_BUFFER);
-			GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MIN_FILTER, GL11C.GL_LINEAR);
-			GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MAG_FILTER, GL11C.GL_LINEAR);
-			GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_S, GL13C.GL_CLAMP_TO_BORDER);
-			GL11C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_T, GL13C.GL_CLAMP_TO_BORDER);
+			final int handle = targets[i];
 
+			texture2dCommands.allocate(handle, 0, format, resolution, resolution, TODO, TODO);
+			texture2dCommands.textureParameter(handle, GL11C.GL_TEXTURE_MIN_FILTER, GL11C.GL_LINEAR);
+			texture2dCommands.textureParameter(handle, GL11C.GL_TEXTURE_MAG_FILTER, GL11C.GL_LINEAR);
+			texture2dCommands.textureParameter(handle, GL11C.GL_TEXTURE_WRAP_S, GL13C.GL_CLAMP_TO_BORDER);
+			texture2dCommands.textureParameter(handle, GL11C.GL_TEXTURE_WRAP_T, GL13C.GL_CLAMP_TO_BORDER);
+
+			// TODO: GL calls
 			framebuffer.addColorAttachment(i, targets[i]);
 			drawBuffers[i] = i;
 		}
