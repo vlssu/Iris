@@ -1,0 +1,25 @@
+package net.coderbot.iris.platform;
+
+public class TriVersion {
+	private final int major;
+	private final int minor;
+	private final int patch;
+
+	public TriVersion(int major, int minor, int patch) {
+		this.major = major;
+		this.minor = minor;
+		this.patch = patch;
+	}
+
+	public int getMajor() {
+		return major;
+	}
+
+	public int getMinor() {
+		return minor;
+	}
+
+	public int getPatch() {
+		return patch;
+	}
+}
