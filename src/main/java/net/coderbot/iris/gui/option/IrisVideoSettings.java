@@ -18,13 +18,13 @@ public class IrisVideoSettings {
 
 	public static int getOverriddenShadowDistance(int base) {
 		return Iris.getPipelineManager().getPipeline()
-				.map(pipeline -> pipeline.getForcedShadowRenderDistanceChunksForDisplay().orElse(base))
+				.map(pipeline -> pipeline.getRenderingSettings().getForcedShadowRenderDistanceChunksForDisplay().orElse(base))
 				.orElse(base);
 	}
 
 	public static boolean isShadowDistanceSliderEnabled() {
 		return Iris.getPipelineManager().getPipeline()
-				.map(pipeline -> !pipeline.getForcedShadowRenderDistanceChunksForDisplay().isPresent())
+				.map(pipeline -> !pipeline.getRenderingSettings().getForcedShadowRenderDistanceChunksForDisplay().isPresent())
 				.orElse(true);
 	}
 
@@ -46,9 +46,9 @@ public class IrisVideoSettings {
 		Component tooltip;
 
 		if (pipeline != null) {
-			d = pipeline.getForcedShadowRenderDistanceChunksForDisplay().orElse(d);
+			d = pipeline.getRenderingSettings().getForcedShadowRenderDistanceChunksForDisplay().orElse(d);
 
-			if (pipeline.getForcedShadowRenderDistanceChunksForDisplay().isPresent()) {
+			if (pipeline.getRenderingSettings().getForcedShadowRenderDistanceChunksForDisplay().isPresent()) {
 				tooltip = DISABLED_TOOLTIP;
 			} else {
 				tooltip = ENABLED_TOOLTIP;

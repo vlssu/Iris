@@ -64,7 +64,7 @@ public class MixinGui {
 	private void iris$disableVignetteRendering(Entity entity, CallbackInfo ci) {
 		WorldRenderingPipeline pipeline = Iris.getPipelineManager().getPipelineNullable();
 
-		if (pipeline != null && !pipeline.shouldRenderVignette()) {
+		if (pipeline != null && !pipeline.getRenderingSettings().shouldRenderVignette()) {
 			ci.cancel();
 		}
 	}

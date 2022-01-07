@@ -1,7 +1,5 @@
 package net.coderbot.iris.mixin;
 
-import java.util.Optional;
-
 import com.mojang.blaze3d.vertex.PoseStack;
 
 import org.spongepowered.asm.mixin.Mixin;
@@ -20,7 +18,7 @@ public abstract class MixinScreenEffectRenderer {
 	private static void iris$disableUnderWaterOverlayRendering(Minecraft minecraft, PoseStack poseStack, CallbackInfo ci) {
 		WorldRenderingPipeline pipeline = Iris.getPipelineManager().getPipelineNullable();
 
-		if (pipeline != null && !pipeline.shouldRenderUnderwaterOverlay()) {
+		if (pipeline != null && !pipeline.getRenderingSettings().shouldRenderUnderwaterOverlay()) {
 			ci.cancel();
 		}
 	}

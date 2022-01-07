@@ -8,11 +8,11 @@ import net.coderbot.iris.uniforms.FrameUpdateNotifier;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import java.util.List;
-import java.util.OptionalInt;
 
 public class FixedFunctionWorldRenderingPipeline implements WorldRenderingPipeline {
 	public FixedFunctionWorldRenderingPipeline() {
-		BlockRenderingSettings.INSTANCE.setDisableDirectionalShading(shouldDisableDirectionalShading());
+		// Note: No need to set the ID maps here
+		BlockRenderingSettings.INSTANCE.setDisableDirectionalShading(false);
 		BlockRenderingSettings.INSTANCE.setUseSeparateAo(false);
 		BlockRenderingSettings.INSTANCE.setAmbientOcclusionLevel(1.0f);
 	}
@@ -32,11 +32,6 @@ public class FixedFunctionWorldRenderingPipeline implements WorldRenderingPipeli
 	@Override
 	public void addDebugText(List<String> messages) {
 		// stub: nothing to do here
-	}
-
-	@Override
-	public OptionalInt getForcedShadowRenderDistanceChunksForDisplay() {
-		return OptionalInt.empty();
 	}
 
 	@Override
@@ -97,39 +92,7 @@ public class FixedFunctionWorldRenderingPipeline implements WorldRenderingPipeli
 	}
 
 	@Override
-	public boolean shouldDisableDirectionalShading() {
-		return false;
-	}
-
-	@Override
-	public boolean shouldRenderClouds() {
-		// Keep clouds enabled
-		return true;
-	}
-
-	@Override
-	public boolean shouldRenderUnderwaterOverlay() {
-		return true;
-	}
-
-	@Override
-	public boolean shouldRenderVignette() {
-		return true;
-	}
-
-	@Override
-	public boolean shouldWriteRainAndSnowToDepthBuffer() {
-		return false;
-	}
-
-	@Override
-	public boolean shouldRenderParticlesBeforeDeferred() {
-		return false;
-	}
-
-	@Override
-	public float getSunPathRotation() {
-		// No sun tilt
-		return 0;
+	public RenderingSettings getRenderingSettings() {
+		return RenderingSettings.DEFAULT;
 	}
 }

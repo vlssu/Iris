@@ -18,9 +18,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
 import net.minecraft.client.renderer.*;
 
-import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -128,7 +126,7 @@ public class MixinLevelRenderer {
 	@Inject(method = "renderSky", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/multiplayer/ClientLevel;getTimeOfDay(F)F"),
 			slice = @Slice(from = @At(value = "FIELD", target = "com/mojang/math/Vector3f.YP : Lcom/mojang/math/Vector3f;")))
 	private void iris$renderSky$tiltSun(PoseStack poseStack, float tickDelta, CallbackInfo callback) {
-		poseStack.mulPose(Vector3f.ZP.rotationDegrees(pipeline.getSunPathRotation()));
+		poseStack.mulPose(Vector3f.ZP.rotationDegrees(pipeline.getRenderingSettings().getSunPathRotation()));
 	}
 
 	@Inject(method = RENDER_SKY, at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/RenderSystem;enableTexture()V"))
@@ -151,7 +149,7 @@ public class MixinLevelRenderer {
 
 	@Inject(method = "renderClouds", at = @At("HEAD"), cancellable = true)
 	private void iris$maybeRemoveClouds(PoseStack poseStack, float tickDelta, double cameraX, double cameraY, double cameraZ, CallbackInfo ci) {
-		if (!pipeline.shouldRenderClouds()) {
+		if (!pipeline.getRenderingSettings().shouldRenderClouds()) {
 			ci.cancel();
 		}
 	}
@@ -190,7 +188,7 @@ public class MixinLevelRenderer {
 
 	@ModifyArg(method = RENDER_WEATHER, at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/RenderSystem;depthMask(Z)V", ordinal = 0))
 	private boolean iris$writeRainAndSnowToDepthBuffer(boolean depthMaskEnabled) {
-		if (pipeline.shouldWriteRainAndSnowToDepthBuffer()) {
+		if (pipeline.getRenderingSettings().shouldWriteRainAndSnowToDepthBuffer()) {
 			return true;
 		}
 

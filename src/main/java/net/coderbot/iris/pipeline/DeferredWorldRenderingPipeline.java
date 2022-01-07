@@ -26,7 +26,6 @@ import net.coderbot.iris.postprocess.FinalPassRenderer;
 import net.coderbot.iris.rendertarget.RenderTargets;
 import net.coderbot.iris.samplers.IrisImages;
 import net.coderbot.iris.samplers.IrisSamplers;
-import net.coderbot.iris.shaderpack.PackShadowDirectives;
 import net.coderbot.iris.shaderpack.ProgramSet;
 import net.coderbot.iris.shaderpack.ProgramSource;
 import net.coderbot.iris.shaderpack.texture.TextureStage;
@@ -49,7 +48,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.OptionalInt;
 import java.util.Set;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
@@ -120,14 +118,7 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline {
 
 	private boolean isBeforeTranslucent;
 
-	private final float sunPathRotation;
-	private final boolean shouldRenderClouds;
-	private final boolean shouldRenderUnderwaterOverlay;
-	private final boolean shouldRenderVignette;
-	private final boolean shouldWriteRainAndSnowToDepthBuffer;
-	private final boolean shouldRenderParticlesBeforeDeferred;
-	private final boolean oldLighting;
-	private final OptionalInt forcedShadowRenderDistanceChunks;
+	private final RenderingSettings renderingSettings;
 
 	private final List<GbufferProgram> programStack = new ArrayList<>();
 	private final List<String> programStackLog = new ArrayList<>();
@@ -137,39 +128,19 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline {
 	public DeferredWorldRenderingPipeline(ProgramSet programs) {
 		Objects.requireNonNull(programs);
 
-		this.shouldRenderClouds = programs.getPackDirectives().areCloudsEnabled();
-		this.shouldRenderUnderwaterOverlay = programs.getPackDirectives().underwaterOverlay();
-		this.shouldRenderVignette = programs.getPackDirectives().vignette();
-		this.shouldWriteRainAndSnowToDepthBuffer = programs.getPackDirectives().rainDepth();
-		this.shouldRenderParticlesBeforeDeferred = programs.getPackDirectives().areParticlesBeforeDeferred();
-		this.oldLighting = programs.getPackDirectives().isOldLighting();
+		this.renderingSettings = new RenderingSettings(programs.getPackDirectives());
 		this.updateNotifier = new FrameUpdateNotifier();
 
 		this.allPasses = new ArrayList<>();
 
 		this.renderTargets = new RenderTargets(Minecraft.getInstance().getMainRenderTarget(), programs.getPackDirectives().getRenderTargetDirectives());
-		this.sunPathRotation = programs.getPackDirectives().getSunPathRotation();
-
-		PackShadowDirectives shadowDirectives = programs.getPackDirectives().getShadowDirectives();
-
-		if (shadowDirectives.isDistanceRenderMulExplicit()) {
-			if (shadowDirectives.getDistanceRenderMul() >= 0.0) {
-				// add 15 and then divide by 16 to ensure we're rounding up
-				forcedShadowRenderDistanceChunks =
-						OptionalInt.of(((int) (shadowDirectives.getDistance() * shadowDirectives.getDistanceRenderMul()) + 15) / 16);
-			} else {
-				forcedShadowRenderDistanceChunks = OptionalInt.of(-1);
-			}
-		} else {
-			forcedShadowRenderDistanceChunks = OptionalInt.empty();
-		}
 
 		BlockRenderingSettings.INSTANCE.setBlockStateIds(
 				BlockMaterialMapping.createBlockStateIdMap(programs.getPack().getIdMap().getBlockProperties()));
 
 		BlockRenderingSettings.INSTANCE.setEntityIds(programs.getPack().getIdMap().getEntityIdMap());
 		BlockRenderingSettings.INSTANCE.setAmbientOcclusionLevel(programs.getPackDirectives().getAmbientOcclusionLevel());
-		BlockRenderingSettings.INSTANCE.setDisableDirectionalShading(shouldDisableDirectionalShading());
+		BlockRenderingSettings.INSTANCE.setDisableDirectionalShading(!programs.getPackDirectives().isOldLighting());
 		BlockRenderingSettings.INSTANCE.setUseSeparateAo(programs.getPackDirectives().shouldUseSeparateAo());
 
 		// Don't clobber anything in texture unit 0. It probably won't cause issues, but we're just being cautious here.
@@ -464,38 +435,8 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline {
 	}
 
 	@Override
-	public boolean shouldDisableDirectionalShading() {
-		return !oldLighting;
-	}
-
-	@Override
-	public boolean shouldRenderClouds() {
-		return shouldRenderClouds;
-	}
-
-	@Override
-	public boolean shouldRenderUnderwaterOverlay() {
-		return shouldRenderUnderwaterOverlay;
-	}
-
-	@Override
-	public boolean shouldRenderVignette() {
-		return shouldRenderVignette;
-	}
-
-	@Override
-	public boolean shouldWriteRainAndSnowToDepthBuffer() {
-		return shouldWriteRainAndSnowToDepthBuffer;
-	}
-
-	@Override
-	public boolean shouldRenderParticlesBeforeDeferred() {
-		return shouldRenderParticlesBeforeDeferred;
-	}
-
-	@Override
-	public float getSunPathRotation() {
-		return sunPathRotation;
+	public RenderingSettings getRenderingSettings() {
+		return renderingSettings;
 	}
 
 	private void beginPass(Pass pass) {
@@ -764,11 +705,6 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline {
 			messages.add("");
 			shadowMapRenderer.addDebugText(messages);
 		}
-	}
-
-	@Override
-	public OptionalInt getForcedShadowRenderDistanceChunksForDisplay() {
-		return forcedShadowRenderDistanceChunks;
 	}
 
 	// TODO: better way to avoid this global state?

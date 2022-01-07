@@ -11,7 +11,6 @@ public interface WorldRenderingPipeline {
 	void beginLevelRendering();
 	void renderShadows(LevelRendererAccessor levelRenderer, Camera camera);
 	void addDebugText(List<String> messages);
-	OptionalInt getForcedShadowRenderDistanceChunksForDisplay();
 	void beginShadowRender();
 	void endShadowRender();
 
@@ -27,12 +26,5 @@ public interface WorldRenderingPipeline {
 	FrameUpdateNotifier getFrameUpdateNotifier();
 
 	boolean shouldDisableVanillaEntityShadows();
-	boolean shouldDisableDirectionalShading();
-	boolean shouldRenderClouds();
-	boolean shouldRenderUnderwaterOverlay();
-	boolean shouldRenderVignette();
-	boolean shouldWriteRainAndSnowToDepthBuffer();
-	boolean shouldRenderParticlesBeforeDeferred();
-
-	float getSunPathRotation();
+	RenderingSettings getRenderingSettings();
 }

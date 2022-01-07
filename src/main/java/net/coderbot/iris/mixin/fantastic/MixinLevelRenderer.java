@@ -7,7 +7,6 @@ import net.coderbot.iris.fantastic.ParticleRenderingPhase;
 import net.coderbot.iris.fantastic.PhasedParticleEngine;
 import net.coderbot.iris.layer.GbufferProgram;
 import net.coderbot.iris.layer.GbufferPrograms;
-import net.coderbot.iris.pipeline.WorldRenderingPipeline;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.particle.ParticleEngine;
@@ -52,7 +51,7 @@ public class MixinLevelRenderer {
 		minecraft.particleEngine.render(poseStack, bufferSource, lightTexture, camera, f);
 
 		((PhasedParticleEngine) minecraft.particleEngine).setParticleRenderingPhase(ParticleRenderingPhase.TRANSLUCENT);
-		if (Iris.getPipelineManager().getPipeline().map(WorldRenderingPipeline::shouldRenderParticlesBeforeDeferred).orElse(false)) {
+		if (Iris.getPipelineManager().getPipeline().map(p -> p.getRenderingSettings().shouldRenderParticlesBeforeDeferred()).orElse(false)) {
 			// Render translucent particles here as well if the pack requests so
 			minecraft.particleEngine.render(poseStack, bufferSource, lightTexture, camera, f);
 		}
@@ -62,7 +61,7 @@ public class MixinLevelRenderer {
 	@Redirect(method = "renderLevel", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/particle/ParticleEngine;render(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource$BufferSource;Lnet/minecraft/client/renderer/LightTexture;Lnet/minecraft/client/Camera;F)V"))
 	private void iris$renderTranslucentAfterDeferred(ParticleEngine instance, PoseStack poseStack, MultiBufferSource.BufferSource bufferSource, LightTexture lightTexture, Camera camera, float f) {
 		// We don't want to render translucent particles again if we already rendered them earlier!
-		if (!Iris.getPipelineManager().getPipeline().map(WorldRenderingPipeline::shouldRenderParticlesBeforeDeferred).orElse(false)) {
+		if (!Iris.getPipelineManager().getPipeline().map(p -> p.getRenderingSettings().shouldRenderParticlesBeforeDeferred()).orElse(false)) {
 			instance.render(poseStack, bufferSource, lightTexture, camera, f);
 		}
 	}
