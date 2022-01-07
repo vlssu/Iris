@@ -37,24 +37,14 @@ public class PackDirectives {
 	PackDirectives(Set<Integer> supportedRenderTargets, ShaderProperties properties) {
 		this(supportedRenderTargets);
 		areCloudsEnabled = properties.areCloudsEnabled();
-		underwaterOverlay = properties.getUnderwaterOverlay().orElse(false);
-		vignette = properties.getVignette().orElse(false);
+		underwaterOverlay = properties.getUnderwaterOverlay().orElse(true);
+		vignette = properties.getVignette().orElse(true);
 		rainDepth = properties.getRainDepth().orElse(false);
 		separateAo = properties.getSeparateAo().orElse(false);
 		oldLighting = properties.getOldLighting().orElse(false);
 		explicitFlips = properties.getExplicitFlips();
 		shadowCulling = properties.getShadowCulling();
 		particlesBeforeDeferred = properties.getParticlesBeforeDeferred().orElse(false);
-	}
-
-	PackDirectives(Set<Integer> supportedRenderTargets, PackDirectives directives) {
-		this(supportedRenderTargets);
-		areCloudsEnabled = directives.areCloudsEnabled();
-		separateAo = directives.separateAo;
-		oldLighting = directives.oldLighting;
-		explicitFlips = directives.explicitFlips;
-		shadowCulling = directives.shadowCulling;
-		particlesBeforeDeferred = directives.particlesBeforeDeferred;
 	}
 
 	public int getNoiseTextureResolution() {
