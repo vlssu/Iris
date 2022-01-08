@@ -17,9 +17,11 @@ import net.coderbot.iris.gl.program.Program;
 import net.coderbot.iris.gl.program.ProgramBuilder;
 import net.coderbot.iris.gl.program.ProgramImages;
 import net.coderbot.iris.gl.program.ProgramSamplers;
+import net.coderbot.iris.gl.texture.InternalTextureFormat;
 import net.coderbot.iris.layer.GbufferProgram;
 import net.coderbot.iris.mixin.LevelRendererAccessor;
-import net.coderbot.iris.postprocess.BufferFlipper;
+import net.coderbot.iris.shaderpack.rendergraph.TextureHandle;
+import net.coderbot.iris.shaderpack.rendergraph.lowering.FlipTracker;
 import net.coderbot.iris.postprocess.CenterDepthSampler;
 import net.coderbot.iris.postprocess.CompositeRenderer;
 import net.coderbot.iris.postprocess.FinalPassRenderer;
@@ -28,6 +30,8 @@ import net.coderbot.iris.samplers.IrisImages;
 import net.coderbot.iris.samplers.IrisSamplers;
 import net.coderbot.iris.shaderpack.ProgramSet;
 import net.coderbot.iris.shaderpack.ProgramSource;
+import net.coderbot.iris.shaderpack.rendergraph.lowering.ShaderPackLowering;
+import net.coderbot.iris.shaderpack.rendergraph.pass.ScreenRenderPassInfo;
 import net.coderbot.iris.shaderpack.texture.TextureStage;
 import net.coderbot.iris.shadows.EmptyShadowMapRenderer;
 import net.coderbot.iris.shadows.ShadowMapRenderer;
@@ -38,18 +42,20 @@ import net.coderbot.iris.vendored.joml.Vector3d;
 import net.coderbot.iris.vendored.joml.Vector4f;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
-import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL15C;
 import org.lwjgl.opengl.GL20C;
 import org.lwjgl.opengl.GL30C;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.IntFunction;
+import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 
 /**
@@ -105,6 +111,7 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline {
 	private Runnable createShadowMapRenderer;
 	private ShadowMapRenderer shadowMapRenderer;
 	private final CompositeRenderer deferredRenderer;
+	private final ScreenPassRenderer compositeRendererNew;
 	private final CompositeRenderer compositeRenderer;
 	private final FinalPassRenderer finalPassRenderer;
 	private final CustomTextureManager customTextureManager;
@@ -159,7 +166,7 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline {
 			createShadowMapRenderer = () -> {};
 		};
 
-		BufferFlipper flipper = new BufferFlipper();
+		FlipTracker flipper = new FlipTracker();
 
 		this.centerDepthSampler = new CenterDepthSampler(renderTargets, updateNotifier);
 
@@ -176,6 +183,43 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline {
 				programs.getPackDirectives().getExplicitFlips("deferred_pre"));
 
 		flippedAfterTranslucent = flipper.snapshot();
+
+		// TODO: Remove all of this stuff duct-taping the new system into the spot of the old one
+		Map<TextureHandle, IntSupplier> textureIDs = new HashMap<>();
+		Map<TextureHandle, InternalTextureFormat> textureFormats = new HashMap<>();
+
+		for (int i = 0; i < renderTargets.getRenderTargetCount(); i++) {
+			TextureHandle main = new TextureHandle("main_color_" + i + ":main");
+			TextureHandle alt = new TextureHandle("main_color_" + i + ":alt");
+
+			net.coderbot.iris.rendertarget.RenderTarget target = renderTargets.get(i);
+
+			textureIDs.put(main, target::getMainTexture);
+			textureIDs.put(alt, target::getAltTexture);
+			textureFormats.put(main, target.getInternalFormat());
+			textureFormats.put(alt, target.getInternalFormat());
+		}
+
+		textureIDs.put(new TextureHandle("main_depth_0"), renderTargets.getDepthTexture()::getTextureId);
+		textureIDs.put(new TextureHandle("main_depth_1"), renderTargets.getDepthTextureNoTranslucents()::getTextureId);
+		textureIDs.put(new TextureHandle("main_depth_2"), renderTargets.getDepthTextureNoHand()::getTextureId);
+
+		// TODO: yeah this sucks but I'm just testing stuff
+		if (shadowMapRenderer == null) {
+			createShadowMapRenderer.run();
+		}
+
+		// TODO: Alt shadow color
+		textureIDs.put(new TextureHandle("shadow_color_0:main"), shadowMapRenderer::getColorTexture0Id);
+		textureIDs.put(new TextureHandle("shadow_color_1:main"), shadowMapRenderer::getColorTexture1Id);
+		textureFormats.put(new TextureHandle("shadow_color_0:main"), InternalTextureFormat.RGBA);
+		textureFormats.put(new TextureHandle("shadow_color_1:main"), InternalTextureFormat.RGBA);
+		textureIDs.put(new TextureHandle("shadow_depth_0"), shadowMapRenderer::getDepthTextureId);
+		textureIDs.put(new TextureHandle("shadow_depth_1"), shadowMapRenderer::getDepthTextureNoTranslucentsId);
+		textureIDs.put(new TextureHandle("noise_tex"), customTextureManager.getNoiseTexture());
+
+		ScreenRenderPassInfo[] compositeRenderPasses = ShaderPackLowering.lowerCompositePasses(programs, programs.getPackDirectives(), flipper.fork());
+		this.compositeRendererNew = new ScreenPassRenderer(textureIDs, textureFormats, updateNotifier, centerDepthSampler, compositeRenderPasses);
 
 		this.compositeRenderer = new CompositeRenderer(programs.getPackDirectives(), programs.getComposite(), renderTargets,
 				customTextureManager.getNoiseTexture(), updateNotifier, centerDepthSampler, flipper, shadowMapRendererSupplier,
@@ -756,7 +800,8 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline {
 		isRenderingWorld = false;
 		programStackLog.clear();
 
-		compositeRenderer.renderAll();
+		//compositeRenderer.renderAll();
+		compositeRendererNew.renderAll();
 		finalPassRenderer.renderFinalPass();
 	}
 

@@ -1,14 +1,18 @@
-package net.coderbot.iris.postprocess;
+package net.coderbot.iris.shaderpack.rendergraph.lowering;
 
 import com.google.common.collect.ImmutableSet;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 
-public class BufferFlipper {
+public class FlipTracker {
 	private final IntSet flippedBuffers;
 
-	public BufferFlipper() {
+	private FlipTracker(IntSet set) {
+		flippedBuffers = new IntOpenHashSet(set);
+	}
+
+	public FlipTracker() {
 		this.flippedBuffers = new IntOpenHashSet();
 	}
 
@@ -36,5 +40,9 @@ public class BufferFlipper {
 
 	public ImmutableSet<Integer> snapshot() {
 		return ImmutableSet.copyOf(flippedBuffers);
+	}
+
+	public FlipTracker fork() {
+		return new FlipTracker(flippedBuffers);
 	}
 }
