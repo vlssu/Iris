@@ -8,12 +8,17 @@ import java.util.Map;
 import java.util.function.IntFunction;
 
 public class TextureInputs {
+	private String defaultSamplerName;
 	private final Map<String, TextureHandle[]> samplers;
 	private final Map<String, ImageBinding[]> images;
 
 	public TextureInputs() {
 		samplers = new HashMap<>();
 		images = new HashMap<>();
+	}
+
+	public String getDefaultSamplerName() {
+		return defaultSamplerName;
 	}
 
 	public Map<String, TextureHandle[]> getSamplers() {
@@ -51,8 +56,11 @@ public class TextureInputs {
 	public void resolveMainColorTargetInputs(ColorTargets colorTargets,
 											 Map<String, TextureHandle> customTextures,
 											 FlipState flipState) {
-		resolveColorTargetInputs(colorTargets, customTextures, flipState,
+		String defaultSamplerName = resolveColorTargetInputs(colorTargets, customTextures, flipState,
 				TextureInputNames::getMainColorSamplerNames, TextureInputNames::getMainColorImageName);
+
+		// TODO: Not for GBuffer programs!
+		this.defaultSamplerName = defaultSamplerName;
 	}
 
 	public void resolveShadowColorTargetInputs(ColorTargets colorTargets,
@@ -77,6 +85,19 @@ public class TextureInputs {
 		}
 	}
 
+	public static TextureHandle[] getInputHandles(ColorTargets colorTargets, FlipState flipState, int buffer) {
+		// Use the buffer flipping / parity state to figure out the texture handles for this buffer.
+		// By default, input textures come from the "main" textures - they only come from the "alt" textures
+		// if a flip is active.
+		boolean alt0 = flipState.isFlippedBeforePass(buffer);
+		boolean alt1 = alt0 ^ flipState.isParitySwapped(buffer);
+
+		return new TextureHandle[] {
+				colorTargets.get(buffer, alt0),
+				colorTargets.get(buffer, alt1)
+		};
+	}
+
 	/**
 	 * Resolves all non-shadow render target inputs, taking into account buffer flipping, custom textures, the legacy
 	 * sampler name aliases, and parity swaps for non-clearing color buffers.
@@ -85,22 +106,15 @@ public class TextureInputs {
 	 * @param customTextures All registered custom textures
 	 * @param flipState The buffer flipping state for this pass
 	 */
-	public void resolveColorTargetInputs(ColorTargets colorTargets,
+	public String resolveColorTargetInputs(ColorTargets colorTargets,
 										 Map<String, TextureHandle> customTextures,
 										 FlipState flipState,
 										 IntFunction<String[]> samplerNames,
 										 IntFunction<String> imageName) {
-		for (int buffer = 0; buffer < colorTargets.numColorTargets(); buffer++) {
-			// Use the buffer flipping / parity state to figure out the texture handles for this buffer.
-			// By default, input textures come from the "main" textures - they only come from the "alt" textures
-			// if a flip is active.
-			boolean alt0 = flipState.isFlippedBeforePass(buffer);
-			boolean alt1 = alt0 ^ flipState.isParitySwapped(buffer);
+		String defaultSamplerName = null;
 
-			TextureHandle[] handles = new TextureHandle[] {
-					colorTargets.get(buffer, alt0),
-					colorTargets.get(buffer, alt1)
-			};
+		for (int buffer = 0; buffer < colorTargets.numColorTargets(); buffer++) {
+			TextureHandle[] handles = getInputHandles(colorTargets, flipState, buffer);
 
 			// Custom texture overrides do not apply to images, and the image bindings only have one name.
 			// Process them first.
@@ -116,6 +130,10 @@ public class TextureInputs {
 			// Now process the sampler side of things.
 			String[] names = samplerNames.apply(buffer);
 
+			if (buffer == 0) {
+				defaultSamplerName = names[0];
+			}
+
 			// Process custom texture overrides, handling the special behavior related to buffer flipping.
 			if (!flipState.isFlippedAtLeastOnceThisGroup(buffer)) {
 				// If it's not flipped, we might have a custom texture. Scan the potential names.
@@ -127,6 +145,8 @@ public class TextureInputs {
 				samplers.put(name, handles);
 			}
 		}
+
+		return defaultSamplerName;
 	}
 
 	public void resolveDepthTargetInputs(DepthTargets depthTargets,

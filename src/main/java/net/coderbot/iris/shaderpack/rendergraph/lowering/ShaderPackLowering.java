@@ -11,10 +11,14 @@ import net.coderbot.iris.shaderpack.ProgramDirectives;
 import net.coderbot.iris.shaderpack.ProgramSet;
 import net.coderbot.iris.shaderpack.ProgramSource;
 import net.coderbot.iris.shaderpack.rendergraph.ColorAttachments;
+import net.coderbot.iris.shaderpack.rendergraph.TextureFilteringMode;
 import net.coderbot.iris.shaderpack.rendergraph.TextureHandle;
 import net.coderbot.iris.shaderpack.rendergraph.TextureSize;
+import net.coderbot.iris.shaderpack.rendergraph.pass.GenerateMipmapPassInfo;
+import net.coderbot.iris.shaderpack.rendergraph.pass.PassInfo;
 import net.coderbot.iris.shaderpack.rendergraph.pass.ScreenRenderPassInfo;
 import net.coderbot.iris.shaderpack.rendergraph.pass.ScreenRenderPassInfoBuilder;
+import net.coderbot.iris.shaderpack.rendergraph.pass.SetTextureMinFilteringPassInfo;
 import net.coderbot.iris.vendored.joml.Vector2f;
 
 import java.util.ArrayList;
@@ -31,7 +35,7 @@ import java.util.Map;
  * version-dependent portions of the Iris codebase that work with OpenGL & Minecraft.
  */
 public class ShaderPackLowering {
-	public static ScreenRenderPassInfo[] lowerCompositePasses(ProgramSet programSet, PackDirectives packDirectives, FlipTracker flipTracker) {
+	public static List<PassInfo> lowerCompositePasses(ProgramSet programSet, PackDirectives packDirectives, FlipTracker flipTracker) {
 		boolean waterShadowEnabled = false;
 
 		// TODO: Initialize these things!!!!!!!!!!
@@ -106,8 +110,7 @@ public class ShaderPackLowering {
 			needsParitySwap.add(target.intValue());
 		});
 
-		ScreenRenderPassInfo[] screenRenderPasses = new ScreenRenderPassInfo[protoPasses.size()];
-		int i = 0;
+		List<PassInfo> builtPasses = new ArrayList<>();
 
 		for (ProtoPass protoPass : protoPasses) {
 			FlipState mainFlipState = new FlipState(protoPass.flippedBeforePass, protoPass.flippedAtLeastOnce, needsParitySwap);
@@ -137,18 +140,38 @@ public class ShaderPackLowering {
 			// noisetex
 			textureInputs.resolveNoiseTex(noisetex, customTextures);
 
+			builder.setDefaultSamplerName(textureInputs.getDefaultSamplerName());
 			builder.setSamplers(textureInputs.getSamplers());
 			builder.setImages(textureInputs.getImages());
 
 			// TODO: Uniforms???
 			builder.setUniforms(new HashSet<>());
 
-			// TODO: Mipmap passes? Samplers?
+			for (int buffer : directives.getMipmappedBuffers()) {
+				TextureHandle[] inputs = TextureInputs.getInputHandles(mainColorTargets, mainFlipState, buffer);
 
-			screenRenderPasses[i++] = builder.build();
+				// TODO: Only generate the mipmap if a valid mipmap hasn't been generated or if we've written to the buffer
+				// (since the last mipmap was generated)
+				//
+				// NB: We leave mipmapping enabled even if the buffer is written to again, this appears to match the
+				// behavior of ShadersMod/OptiFine, however I'm not sure if it's desired behavior. It's possible that a
+				// program could use mipmapped sampling with a stale mipmap, which probably isn't great. However, the
+				// sampling mode is always reset between frames, so this only persists after the first program to use
+				// mipmapping on this buffer.
+				//
+				// Also note that this only applies to one of the two buffers in a render target buffer pair - making it
+				// unlikely that this issue occurs in practice with most shader packs.
+				builtPasses.add(new GenerateMipmapPassInfo(inputs));
+				builtPasses.add(new SetTextureMinFilteringPassInfo(inputs, TextureFilteringMode.LINEAR_MIPMAP_LINEAR));
+
+				// TODO: Add passes at the end to reset the filtering mode, currently this is handled by the old
+				//  system in FinalPassRenderer
+			}
+
+			builtPasses.add(builder.build());
 		}
 
-		return screenRenderPasses;
+		return builtPasses;
 	}
 
 	private static ColorAttachments[] resolveColorAttachments(ColorTargets renderTargets, int[] drawBuffers,

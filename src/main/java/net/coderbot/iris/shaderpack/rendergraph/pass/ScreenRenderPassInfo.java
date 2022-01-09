@@ -9,8 +9,12 @@ import net.coderbot.iris.vendored.joml.Vector2f;
 import java.util.Map;
 import java.util.Set;
 
-public class ScreenRenderPassInfo {
+public class ScreenRenderPassInfo implements PassInfo {
 	private final ProgramSource source;
+	// TODO: This defaultSamplerName behavior is ugly, but is needed for packs that depend on default
+	//       sampler binding behavior (like Enhanced Default). We might need another lowering pass
+	//       that makes use of program introspection.
+	private final String defaultSamplerName;
 	private final Map<String, TextureHandle[]> samplers;
 	private final Map<String, ImageBinding[]> images;
 	private final Set<String> uniforms;
@@ -18,9 +22,11 @@ public class ScreenRenderPassInfo {
 	private final Vector2f viewportScale;
 
 	public ScreenRenderPassInfo(ProgramSource source, Map<String, TextureHandle[]> samplers,
+								String defaultSamplerName,
 								Map<String, ImageBinding[]> images, Set<String> uniforms,
 								ColorAttachments[] attachmentsByParity, Vector2f viewportScale) {
 		this.source = source;
+		this.defaultSamplerName = defaultSamplerName;
 		this.samplers = samplers;
 		this.images = images;
 		this.uniforms = uniforms;
@@ -34,6 +40,10 @@ public class ScreenRenderPassInfo {
 
 	public ProgramSource getSource() {
 		return source;
+	}
+
+	public String getDefaultSamplerName() {
+		return defaultSamplerName;
 	}
 
 	public Map<String, TextureHandle[]> getSamplers() {

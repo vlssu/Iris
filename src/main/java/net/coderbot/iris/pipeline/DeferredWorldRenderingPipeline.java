@@ -31,6 +31,7 @@ import net.coderbot.iris.samplers.IrisSamplers;
 import net.coderbot.iris.shaderpack.ProgramSet;
 import net.coderbot.iris.shaderpack.ProgramSource;
 import net.coderbot.iris.shaderpack.rendergraph.lowering.ShaderPackLowering;
+import net.coderbot.iris.shaderpack.rendergraph.pass.PassInfo;
 import net.coderbot.iris.shaderpack.rendergraph.pass.ScreenRenderPassInfo;
 import net.coderbot.iris.shaderpack.texture.TextureStage;
 import net.coderbot.iris.shadows.EmptyShadowMapRenderer;
@@ -218,7 +219,7 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline {
 		textureIDs.put(new TextureHandle("shadow_depth_1"), shadowMapRenderer::getDepthTextureNoTranslucentsId);
 		textureIDs.put(new TextureHandle("noise_tex"), customTextureManager.getNoiseTexture());
 
-		ScreenRenderPassInfo[] compositeRenderPasses = ShaderPackLowering.lowerCompositePasses(programs, programs.getPackDirectives(), flipper.fork());
+		List<PassInfo> compositeRenderPasses = ShaderPackLowering.lowerCompositePasses(programs, programs.getPackDirectives(), flipper.fork());
 		this.compositeRendererNew = new ScreenPassRenderer(textureIDs, textureFormats, updateNotifier, centerDepthSampler, compositeRenderPasses);
 
 		this.compositeRenderer = new CompositeRenderer(programs.getPackDirectives(), programs.getComposite(), renderTargets,

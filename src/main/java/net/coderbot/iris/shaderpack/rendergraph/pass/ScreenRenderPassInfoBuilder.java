@@ -12,6 +12,7 @@ import java.util.Set;
 
 public class ScreenRenderPassInfoBuilder {
 	private ProgramSource source;
+	private String defaultSamplerName;
     private Map<String, TextureHandle[]> samplers;
     private Map<String, ImageBinding[]> images;
     private Set<String> uniforms;
@@ -24,6 +25,11 @@ public class ScreenRenderPassInfoBuilder {
 
 	public ScreenRenderPassInfoBuilder setSource(ProgramSource source) {
 		this.source = source;
+		return this;
+	}
+
+	public ScreenRenderPassInfoBuilder setDefaultSamplerName(String defaultSamplerName) {
+		this.defaultSamplerName = defaultSamplerName;
 		return this;
 	}
 
@@ -53,7 +59,8 @@ public class ScreenRenderPassInfoBuilder {
     }
 
     public ScreenRenderPassInfo build() {
-        return new ScreenRenderPassInfo(Objects.requireNonNull(source), Objects.requireNonNull(samplers), Objects.requireNonNull(images),
+        return new ScreenRenderPassInfo(Objects.requireNonNull(source), Objects.requireNonNull(samplers),
+				Objects.requireNonNull(defaultSamplerName), Objects.requireNonNull(images),
 				Objects.requireNonNull(uniforms), Objects.requireNonNull(attachmentsByParity),
 				Objects.requireNonNull(viewportScale));
     }

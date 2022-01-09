@@ -1,7 +1,6 @@
 package net.coderbot.iris.pipeline;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -15,12 +14,15 @@ import net.coderbot.iris.gl.uniform.UniformUpdateFrequency;
 import net.coderbot.iris.postprocess.CenterDepthSampler;
 import net.coderbot.iris.postprocess.FullScreenQuadRenderer;
 import net.coderbot.iris.samplers.IrisSamplers;
-import net.coderbot.iris.shaderpack.ProgramDirectives;
 import net.coderbot.iris.shaderpack.ProgramSource;
 import net.coderbot.iris.shaderpack.rendergraph.ColorAttachments;
 import net.coderbot.iris.shaderpack.rendergraph.ImageBinding;
+import net.coderbot.iris.shaderpack.rendergraph.TextureFilteringMode;
 import net.coderbot.iris.shaderpack.rendergraph.TextureHandle;
+import net.coderbot.iris.shaderpack.rendergraph.pass.GenerateMipmapPassInfo;
+import net.coderbot.iris.shaderpack.rendergraph.pass.PassInfo;
 import net.coderbot.iris.shaderpack.rendergraph.pass.ScreenRenderPassInfo;
+import net.coderbot.iris.shaderpack.rendergraph.pass.SetTextureMinFilteringPassInfo;
 import net.coderbot.iris.uniforms.CommonUniforms;
 import net.coderbot.iris.uniforms.FrameUpdateNotifier;
 import net.coderbot.iris.vendored.joml.Vector2f;
@@ -29,6 +31,7 @@ import org.lwjgl.opengl.GL15C;
 import org.lwjgl.opengl.GL20C;
 import org.lwjgl.opengl.GL30C;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.IntSupplier;
@@ -42,39 +45,62 @@ public class ScreenPassRenderer {
 							  Map<TextureHandle, InternalTextureFormat> textureFormats,
 							  FrameUpdateNotifier updateNotifier,
 							  CenterDepthSampler centerDepthSampler,
-							  ScreenRenderPassInfo[] renderPasses) {
+							  List<PassInfo> passInfoList) {
 		this.updateNotifier = updateNotifier;
 		this.centerDepthSampler = centerDepthSampler;
 
 		final ImmutableList.Builder<Pass> passes = ImmutableList.builder();
 
-		for (ScreenRenderPassInfo passInfo : renderPasses) {
-			Pass pass = new Pass();
-			ProgramSource source = passInfo.getSource();
-			ProgramDirectives directives = source.getDirectives();
+		for (PassInfo passInfoAny : passInfoList) {
+			if (passInfoAny instanceof ScreenRenderPassInfo) {
+				ScreenRenderPassInfo passInfo = (ScreenRenderPassInfo) passInfoAny;
+				ScreenRenderPass pass = new ScreenRenderPass();
 
-			pass.program = createProgram(source, textureIDs, textureFormats, passInfo.getSamplers(), passInfo.getImages());
+				ProgramSource source = passInfo.getSource();
 
-			// Initialize framebuffer.
-			ColorAttachments attachments = passInfo.getAttachmentsByParity()[0];
-			TextureHandle[] colorAttachments = attachments.getTextures();
-			int[] drawBuffers = new int[colorAttachments.length];
+				pass.program = createProgram(source, textureIDs, textureFormats, passInfo.getDefaultSamplerName(),
+						passInfo.getSamplers(), passInfo.getImages());
 
-			GlFramebuffer framebuffer = new GlFramebuffer();
+				// Initialize framebuffer.
+				ColorAttachments attachments = passInfo.getAttachmentsByParity()[0];
+				TextureHandle[] colorAttachments = attachments.getTextures();
+				int[] drawBuffers = new int[colorAttachments.length];
 
-			for (int i = 0; i < colorAttachments.length; i++) {
-				// TODO: Shouldn't use IntSupplier here, it doesn't give us enough info to tell if it will change or not.
-				framebuffer.addColorAttachment(i, textureIDs.get(colorAttachments[i]).getAsInt());
-				drawBuffers[i] = i;
+				GlFramebuffer framebuffer = new GlFramebuffer();
+
+				for (int i = 0; i < colorAttachments.length; i++) {
+					// TODO: Shouldn't use IntSupplier here, it doesn't give us enough info to tell if it will change or not.
+					framebuffer.addColorAttachment(i, textureIDs.get(colorAttachments[i]).getAsInt());
+					drawBuffers[i] = i;
+				}
+
+				framebuffer.drawBuffers(drawBuffers);
+
+				pass.framebuffer = framebuffer;
+				pass.viewportScale = passInfo.getViewportScale();
+
+				passes.add(pass);
+			} else if (passInfoAny instanceof GenerateMipmapPassInfo) {
+				GenerateMipmapPassInfo passInfo = ((GenerateMipmapPassInfo) passInfoAny);
+
+				passes.add(new GenerateMipmapPass(textureIDs.get(passInfo.getTarget()[0])));
+			} else if (passInfoAny instanceof SetTextureMinFilteringPassInfo) {
+				SetTextureMinFilteringPassInfo passInfo = ((SetTextureMinFilteringPassInfo) passInfoAny);
+				TextureFilteringMode filteringMode = passInfo.getFilteringMode();
+				int mode;
+
+				if (filteringMode == TextureFilteringMode.LINEAR) {
+					mode = GL20C.GL_LINEAR;
+				} else if (filteringMode == TextureFilteringMode.NEAREST) {
+					mode = GL20C.GL_NEAREST;
+				} else if (filteringMode == TextureFilteringMode.LINEAR_MIPMAP_LINEAR) {
+					mode = GL20C.GL_LINEAR_MIPMAP_LINEAR;
+				} else {
+					throw new IllegalArgumentException("Unknown texture filtering mode " + filteringMode);
+				}
+
+				passes.add(new SetTextureMinFilteringPass(textureIDs.get(passInfo.getTarget()[0]), mode));
 			}
-
-			framebuffer.drawBuffers(drawBuffers);
-
-			pass.framebuffer = framebuffer;
-			pass.viewportScale = passInfo.getViewportScale();
-			pass.mipmappedBuffers = directives.getMipmappedBuffers();
-
-			passes.add(pass);
 		}
 
 		this.passes = passes.build();
@@ -82,17 +108,68 @@ public class ScreenPassRenderer {
 		GlStateManager._glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, 0);
 	}
 
-	private static final class Pass {
-		Program program;
-		GlFramebuffer framebuffer;
-		ImmutableSet<Integer> mipmappedBuffers;
-		Vector2f viewportScale;
+	private interface Pass {
+		void run(int baseWidth, int baseHeight);
+		default void destroy() {}
+	}
 
-		private void destroy() {
-			this.program.destroy();
+	private static final class GenerateMipmapPass implements Pass {
+		private final IntSupplier target;
+
+		public GenerateMipmapPass(IntSupplier target) {
+			this.target = target;
+		}
+
+		@Override
+		public void run(int baseWidth, int baseHeight) {
+			RenderSystem.activeTexture(GL20C.GL_TEXTURE0);
+			RenderSystem.bindTexture(target.getAsInt());
+			IrisRenderSystem.generateMipmaps(GL20C.GL_TEXTURE_2D);
 		}
 	}
 
+	private static final class SetTextureMinFilteringPass implements Pass {
+		private final IntSupplier target;
+		private final int mode;
+
+		public SetTextureMinFilteringPass(IntSupplier target, int mode) {
+			this.target = target;
+			this.mode = mode;
+		}
+
+		@Override
+		public void run(int baseWidth, int baseHeight) {
+			RenderSystem.activeTexture(GL20C.GL_TEXTURE0);
+			RenderSystem.bindTexture(target.getAsInt());
+			RenderSystem.texParameter(GL20C.GL_TEXTURE_2D, GL20C.GL_TEXTURE_MIN_FILTER, mode);
+		}
+	}
+
+	private static final class ScreenRenderPass implements Pass {
+		Program program;
+		GlFramebuffer framebuffer;
+		Vector2f viewportScale;
+
+		@Override
+		public void destroy() {
+			this.program.destroy();
+		}
+
+		@Override
+		public void run(int baseWidth, int baseHeight) {
+			float scaledWidth = baseWidth * viewportScale.x;
+			float scaledHeight = baseHeight * viewportScale.y;
+			RenderSystem.viewport(0, 0, (int) scaledWidth, (int) scaledHeight);
+
+			framebuffer.bind();
+			program.use();
+
+			FullScreenQuadRenderer.INSTANCE.renderQuad();
+		}
+	}
+
+	// we have to call the alpha test here even though it's deprecated.
+	@SuppressWarnings("deprecation")
 	public void renderAll() {
 		RenderSystem.disableBlend();
 		RenderSystem.disableAlphaTest();
@@ -104,36 +181,20 @@ public class ScreenPassRenderer {
 		FullScreenQuadRenderer.INSTANCE.begin();
 
 		for (Pass renderPass : passes) {
-			// TODO: Mipmapping!
-			/*if (!renderPass.mipmappedBuffers.isEmpty()) {
-				RenderSystem.activeTexture(GL15C.GL_TEXTURE0);
-
-				for (int index : renderPass.mipmappedBuffers) {
-					setupMipmapping(renderTargets.get(index), renderPass.stageReadsFromAlt.contains(index));
-				}
-			}*/
-
-			float scaledWidth = baseWidth * renderPass.viewportScale.x;
-			float scaledHeight = baseHeight * renderPass.viewportScale.y;
-			RenderSystem.viewport(0, 0, (int) scaledWidth, (int) scaledHeight);
-
-			renderPass.framebuffer.bind();
-			renderPass.program.use();
-
-			FullScreenQuadRenderer.INSTANCE.renderQuad();
+			renderPass.run(baseWidth, baseHeight);
 		}
 
 		FullScreenQuadRenderer.end();
 
-		// Make sure to reset the viewport to how it was before... Otherwise weird issues could occur.
+		// Make sure to reset the viewport to how it was before... Otherwise, weird issues could occur.
 		// Also bind the "main" framebuffer if it isn't already bound.
 		main.bindWrite(true);
 		GlStateManager._glUseProgram(0);
 
-		// NB: Unbinding all of these textures is necessary for proper shaderpack reloading.
+		// NB: Unbinding all of these textures is necessary for proper shader pack reloading.
 		for (int i = 0; i < SamplerLimits.get().getMaxTextureUnits(); i++) {
 			// Unbind all textures that we may have used.
-			// NB: This is necessary for shader pack reloading to work propely
+			// NB: This is necessary for shader pack reloading to work properly
 			RenderSystem.activeTexture(GL15C.GL_TEXTURE0 + i);
 			RenderSystem.bindTexture(0);
 		}
@@ -141,27 +202,9 @@ public class ScreenPassRenderer {
 		RenderSystem.activeTexture(GL15C.GL_TEXTURE0);
 	}
 
-	private static void setupMipmapping(net.coderbot.iris.rendertarget.RenderTarget target, boolean readFromAlt) {
-		RenderSystem.bindTexture(readFromAlt ? target.getAltTexture() : target.getMainTexture());
-
-		// TODO: Only generate the mipmap if a valid mipmap hasn't been generated or if we've written to the buffer
-		// (since the last mipmap was generated)
-		//
-		// NB: We leave mipmapping enabled even if the buffer is written to again, this appears to match the
-		// behavior of ShadersMod/OptiFine, however I'm not sure if it's desired behavior. It's possible that a
-		// program could use mipmapped sampling with a stale mipmap, which probably isn't great. However, the
-		// sampling mode is always reset between frames, so this only persists after the first program to use
-		// mipmapping on this buffer.
-		//
-		// Also note that this only applies to one of the two buffers in a render target buffer pair - making it
-		// unlikely that this issue occurs in practice with most shader packs.
-		IrisRenderSystem.generateMipmaps(GL20C.GL_TEXTURE_2D);
-		RenderSystem.texParameter(GL20C.GL_TEXTURE_2D, GL20C.GL_TEXTURE_MIN_FILTER, GL20C.GL_LINEAR_MIPMAP_LINEAR);
-	}
-
-	// TODO: Don't just copy this from DeferredWorldRenderingPipeline
 	private Program createProgram(ProgramSource source, Map<TextureHandle, IntSupplier> textureIDs,
 								  Map<TextureHandle, InternalTextureFormat> textureFormats,
+								  String defaultSamplerName,
 								  Map<String, TextureHandle[]> samplers, Map<String, ImageBinding[]> images) {
 		// TODO: Properly handle empty shaders
 		Objects.requireNonNull(source.getVertexSource());
@@ -176,6 +219,8 @@ public class ScreenPassRenderer {
 			throw new RuntimeException("Shader compilation failed!", e);
 		}
 
+		builder.addDefaultSampler(textureIDs.get(samplers.get(defaultSamplerName)[0]), defaultSamplerName);
+
 		samplers.forEach((name, handles) -> {
 			IntSupplier textureID = textureIDs.get(handles[0]);
 
@@ -183,7 +228,9 @@ public class ScreenPassRenderer {
 				throw new IllegalStateException("Missing textureID for " + handles[0]);
 			}
 
-			builder.addDynamicSampler(textureID, name);
+			if (!name.equals(defaultSamplerName)) {
+				builder.addDynamicSampler(textureID, name);
+			}
 		});
 
 		images.forEach((name, bindings) -> {
@@ -207,7 +254,7 @@ public class ScreenPassRenderer {
 		CommonUniforms.addCommonUniforms(builder, source.getParent().getPack().getIdMap(), source.getParent().getPackDirectives(), updateNotifier);
 
 		// TODO: Don't duplicate this with FinalPassRenderer
-		// TODO: Parse the value of const float centerDepthSmoothHalflife from the shaderpack's fragment shader configuration
+		// TODO: Parse the value of const float centerDepthSmoothHalflife from the shader pack's fragment shader configuration
 		builder.uniform1f(UniformUpdateFrequency.PER_FRAME, "centerDepthSmooth", this.centerDepthSampler::getCenterDepthSmoothSample);
 
 		return builder.build();
