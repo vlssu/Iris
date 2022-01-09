@@ -53,9 +53,20 @@ public class TextureInputs {
 		return new TextureHandle[] { base, base };
 	}
 
+	/*
+	TODO for gbuffer/shadow:
+	 - texture / tex / gtexture
+	 - lightmap
+	 - normals
+	 - specular
+	 - don't expose certain depth targets?
+	 */
+
 	public void resolveMainColorTargetInputs(ColorTargets colorTargets,
 											 Map<String, TextureHandle> customTextures,
 											 FlipState flipState) {
+		// TODO: If we don't do anything special here, this will make colortex0-3 (and their legacy names) available to
+		//       gbuffer/shadow programs... Should we allow that?
 		String defaultSamplerName = resolveColorTargetInputs(colorTargets, customTextures, flipState,
 				TextureInputNames::getMainColorSamplerNames, TextureInputNames::getMainColorImageName);
 
