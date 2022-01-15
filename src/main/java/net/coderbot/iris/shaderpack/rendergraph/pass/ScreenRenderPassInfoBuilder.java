@@ -3,7 +3,7 @@ package net.coderbot.iris.shaderpack.rendergraph.pass;
 import net.coderbot.iris.shaderpack.ProgramSource;
 import net.coderbot.iris.shaderpack.rendergraph.ColorAttachments;
 import net.coderbot.iris.shaderpack.rendergraph.ImageBinding;
-import net.coderbot.iris.shaderpack.rendergraph.TextureHandle;
+import net.coderbot.iris.shaderpack.rendergraph.sampler.SamplerBinding;
 import net.coderbot.iris.vendored.joml.Vector2f;
 
 import java.util.Map;
@@ -13,7 +13,7 @@ import java.util.Set;
 public class ScreenRenderPassInfoBuilder {
 	private ProgramSource source;
 	private String defaultSamplerName;
-    private Map<String, TextureHandle[]> samplers;
+    private Map<String, SamplerBinding[]> samplers;
     private Map<String, ImageBinding[]> images;
     private Set<String> uniforms;
     private ColorAttachments[] attachmentsByParity;
@@ -33,7 +33,7 @@ public class ScreenRenderPassInfoBuilder {
 		return this;
 	}
 
-    public ScreenRenderPassInfoBuilder setSamplers(Map<String, TextureHandle[]> samplers) {
+    public ScreenRenderPassInfoBuilder setSamplers(Map<String, SamplerBinding[]> samplers) {
         this.samplers = samplers;
         return this;
     }

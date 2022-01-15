@@ -3,7 +3,7 @@ package net.coderbot.iris.shaderpack.rendergraph.pass;
 import net.coderbot.iris.shaderpack.ProgramSource;
 import net.coderbot.iris.shaderpack.rendergraph.ColorAttachments;
 import net.coderbot.iris.shaderpack.rendergraph.ImageBinding;
-import net.coderbot.iris.shaderpack.rendergraph.TextureHandle;
+import net.coderbot.iris.shaderpack.rendergraph.sampler.SamplerBinding;
 import net.coderbot.iris.vendored.joml.Vector2f;
 
 import java.util.Map;
@@ -15,13 +15,13 @@ public class ScreenRenderPassInfo implements PassInfo {
 	//       sampler binding behavior (like Enhanced Default). We might need another lowering pass
 	//       that makes use of program introspection.
 	private final String defaultSamplerName;
-	private final Map<String, TextureHandle[]> samplers;
+	private final Map<String, SamplerBinding[]> samplers;
 	private final Map<String, ImageBinding[]> images;
 	private final Set<String> uniforms;
 	private final ColorAttachments[] attachmentsByParity;
 	private final Vector2f viewportScale;
 
-	public ScreenRenderPassInfo(ProgramSource source, Map<String, TextureHandle[]> samplers,
+	public ScreenRenderPassInfo(ProgramSource source, Map<String, SamplerBinding[]> samplers,
 								String defaultSamplerName,
 								Map<String, ImageBinding[]> images, Set<String> uniforms,
 								ColorAttachments[] attachmentsByParity, Vector2f viewportScale) {
@@ -46,7 +46,7 @@ public class ScreenRenderPassInfo implements PassInfo {
 		return defaultSamplerName;
 	}
 
-	public Map<String, TextureHandle[]> getSamplers() {
+	public Map<String, SamplerBinding[]> getSamplers() {
 		return samplers;
 	}
 

@@ -23,6 +23,7 @@ import net.coderbot.iris.shaderpack.rendergraph.pass.GenerateMipmapPassInfo;
 import net.coderbot.iris.shaderpack.rendergraph.pass.PassInfo;
 import net.coderbot.iris.shaderpack.rendergraph.pass.ScreenRenderPassInfo;
 import net.coderbot.iris.shaderpack.rendergraph.pass.SetTextureMinFilteringPassInfo;
+import net.coderbot.iris.shaderpack.rendergraph.sampler.SamplerBinding;
 import net.coderbot.iris.uniforms.CommonUniforms;
 import net.coderbot.iris.uniforms.FrameUpdateNotifier;
 import net.coderbot.iris.vendored.joml.Vector2f;
@@ -205,7 +206,7 @@ public class ScreenPassRenderer {
 	private Program createProgram(ProgramSource source, Map<TextureHandle, IntSupplier> textureIDs,
 								  Map<TextureHandle, InternalTextureFormat> textureFormats,
 								  String defaultSamplerName,
-								  Map<String, TextureHandle[]> samplers, Map<String, ImageBinding[]> images) {
+								  Map<String, SamplerBinding[]> samplers, Map<String, ImageBinding[]> images) {
 		// TODO: Properly handle empty shaders
 		Objects.requireNonNull(source.getVertexSource());
 		Objects.requireNonNull(source.getFragmentSource());
@@ -219,10 +220,11 @@ public class ScreenPassRenderer {
 			throw new RuntimeException("Shader compilation failed!", e);
 		}
 
-		builder.addDefaultSampler(textureIDs.get(samplers.get(defaultSamplerName)[0]), defaultSamplerName);
+		// TODO: Actually use the sampler binding instead of only caring about the texture.
+		builder.addDefaultSampler(textureIDs.get(samplers.get(defaultSamplerName)[0].getTexture()), defaultSamplerName);
 
 		samplers.forEach((name, handles) -> {
-			IntSupplier textureID = textureIDs.get(handles[0]);
+			IntSupplier textureID = textureIDs.get(handles[0].getTexture());
 
 			if (textureID == null) {
 				throw new IllegalStateException("Missing textureID for " + handles[0]);
