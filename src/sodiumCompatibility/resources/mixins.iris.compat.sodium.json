@@ -12,6 +12,7 @@
   "client": [
     "block_id.MixinChunkBuildBuffers",
     "block_id.MixinChunkRenderRebuildTask",
+    "coplanar_fluids.MixinFluidRenderer",
     "directional_shading.MixinFlatLightPipeline",
     "directional_shading.MixinSmoothLightPipeline",
     "options.MixinChunkRenderManager",
