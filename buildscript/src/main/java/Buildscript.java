@@ -10,6 +10,7 @@ import java.util.function.Consumer;
 
 import io.github.coolcrabs.brachyura.compiler.java.JavaCompilation;
 import io.github.coolcrabs.brachyura.compiler.java.JavaCompilationResult;
+import io.github.coolcrabs.brachyura.dependency.Dependency;
 import io.github.coolcrabs.brachyura.dependency.JavaJarDependency;
 import io.github.coolcrabs.brachyura.fabric.FabricContext;
 import io.github.coolcrabs.brachyura.fabric.FabricLoader;
@@ -18,6 +19,7 @@ import io.github.coolcrabs.brachyura.fabric.FabricModule;
 import io.github.coolcrabs.brachyura.fabric.SimpleFabricProject;
 import io.github.coolcrabs.brachyura.fabric.FabricContext.ModDependencyCollector;
 import io.github.coolcrabs.brachyura.fabric.FabricContext.ModDependencyFlag;
+import io.github.coolcrabs.brachyura.ide.IdeModule;
 import io.github.coolcrabs.brachyura.mappings.Namespaces;
 import io.github.coolcrabs.brachyura.maven.Maven;
 import io.github.coolcrabs.brachyura.maven.MavenId;
@@ -31,6 +33,7 @@ import io.github.coolcrabs.brachyura.project.Task;
 import io.github.coolcrabs.brachyura.project.java.BuildModule;
 import io.github.coolcrabs.brachyura.util.JvmUtil;
 import io.github.coolcrabs.brachyura.util.Lazy;
+import io.github.coolcrabs.brachyura.util.PathUtil;
 import io.github.coolcrabs.brachyura.util.Util;
 import net.fabricmc.mappingio.MappingReader;
 import net.fabricmc.mappingio.format.MappingFormat;
@@ -51,7 +54,8 @@ public class Buildscript extends SimpleFabricProject {
 		"main",
 		"vendored",
 		SODIUM ? "sodiumCompatibility" : "noSodiumStub",
-		"headers"
+		"headers",
+		"test"
 	};
 
 	private static final String[] HEADER_SOURCE_SETS = new String[] {
@@ -83,13 +87,20 @@ public class Buildscript extends SimpleFabricProject {
 		return new IrisFabricModule(context.get());
 	}
 
-    @Override
+	@Override
+	protected FabricContext createContext() {
+		return new IrisFabricContext();
+	}
+
+	@Override
     public void getModDependencies(ModDependencyCollector d) {
 		jij(d.addMaven(Maven.MAVEN_CENTRAL, new MavenId("org.anarres:jcpp:1.4.14"), ModDependencyFlag.COMPILE, ModDependencyFlag.RUNTIME));
 		jij(d.addMaven(Maven.MAVEN_CENTRAL, new MavenId("org.slf4j:slf4j-api:1.7.12"), ModDependencyFlag.COMPILE, ModDependencyFlag.RUNTIME));
 		jij(d.addMaven(FabricMaven.URL, new MavenId(FabricMaven.GROUP_ID + ".fabric-api", "fabric-resource-loader-v0", "0.4.8+3cc0f0907d"), ModDependencyFlag.COMPILE, ModDependencyFlag.RUNTIME));
 		jij(d.addMaven(FabricMaven.URL, new MavenId(FabricMaven.GROUP_ID + ".fabric-api", "fabric-key-binding-api-v1", "1.0.5+3cc0f0907d"), ModDependencyFlag.COMPILE, ModDependencyFlag.RUNTIME));
 		jij(d.addMaven(FabricMaven.URL, new MavenId(FabricMaven.GROUP_ID + ".fabric-api", "fabric-api-base", "0.4.0+3cc0f0907d"), ModDependencyFlag.COMPILE, ModDependencyFlag.RUNTIME));
+
+		d.addMaven(Maven.MAVEN_CENTRAL, new MavenId("org.apache.logging.log4j:log4j-slf4j-impl:2.8.1"), ModDependencyFlag.COMPILE, ModDependencyFlag.RUNTIME);
 
 		if (SODIUM) {
 			if (CUSTOM_SODIUM) {
@@ -103,12 +114,6 @@ public class Buildscript extends SimpleFabricProject {
 	@Override
 	public String getMavenGroup() {
 		return "net.coderbot.iris_mc" + (MC_VERSION.replace('.', '_'));
-	}
-
-	@Override
-	public void getTasks(Consumer<Task> p) {
-		super.getTasks(p);
-		super.getPublishTasks(p);
 	}
 
 	private Path[] getDirs(String subdirectory) {
@@ -181,9 +186,34 @@ public class Buildscript extends SimpleFabricProject {
 		return new ProcessorChain(super.resourcesProcessingChain(), new FmjVersionFixer(this));
 	}
 
+	public class IrisFabricContext extends SimpleFabricContext {
+		@Override
+		protected List<Dependency> createDependencies() {
+			List<Dependency> dependencies = super.createDependencies();
+
+			dependencies.add(Maven.getMavenJarDep(Maven.MAVEN_CENTRAL,
+				new MavenId("org.junit.platform:junit-platform-console-standalone:1.8.2")));
+
+			return dependencies;
+		}
+	}
+
 	public class IrisFabricModule extends SimpleFabricModule {
 		public IrisFabricModule(FabricContext context) {
 			super(context);
+		}
+
+		@Override
+		public IdeModule ideModule() {
+			IdeModule base = super.ideModule();
+			Path cwd = PathUtil.resolveAndCreateDir(getModuleRoot(), "run");
+
+			return new IdeModule.IdeModuleBuilder(base)
+				// TODO: Classpath is inferred by IDEA... How do other IDEs behave?
+				.testRunConfigs(new IdeModule.TestRunConfigBuilder()
+					.name("Tests")
+					.cwd(cwd)
+					.testPackage("net.coderbot.iris.test")).build();
 		}
 
 		private ProcessingSink createHeaderClassFilter(JavaCompilationResult compilation, ProcessingSink finalOutput) {
