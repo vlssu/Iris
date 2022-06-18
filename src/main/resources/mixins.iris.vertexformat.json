@@ -7,6 +7,7 @@
     "MixinBufferBuilder",
     "MixinVertexFormatElement",
     "MixinGlStateManager",
+    "MixinSpriteCoordinateExpander",
     "MixinVertexBuffer",
     "MixinVertexFormat",
     "block_rendering.MixinBufferBuilder_SeparateAo",

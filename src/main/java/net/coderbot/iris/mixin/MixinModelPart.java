@@ -33,12 +33,15 @@ public class MixinModelPart {
 
 	@Inject(method = "compile", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/VertexConsumer;vertex(FFFFFFFFFIIFFF)V"), locals = LocalCapture.CAPTURE_FAILHARD)
 	private void setModelPart(PoseStack.Pose arg, VertexConsumer arg2, int i, int j, float f, float g, float h, float k, CallbackInfo ci, Matrix4f lv, Matrix3f lv2, ObjectListIterator var11, ModelPart.Cube lv3, ModelPart.Polygon[] var13, int var14, int var15, ModelPart.Polygon lv4, Vector3f lv5, float l, float m, float n, int o, ModelPart.Vertex lv6, float p, float q, float r, Vector4f lv7) {
-		velocity[var15][o].setPos(lv7.x(), lv7.y(), lv7.z());
-		((BlockSensitiveBufferBuilder) arg2).beginEntity(velocity[var15][o]);
+		if (arg2 instanceof BlockSensitiveBufferBuilder) {
+			((BlockSensitiveBufferBuilder) arg2).beginEntity(velocity[var15][o]);
+		}
 	}
 
 	@Inject(method = "compile", at = @At(value = "TAIL"))
 	private void resetModelPart(PoseStack.Pose arg, VertexConsumer arg2, int i, int j, float f, float g, float h, float k, CallbackInfo ci) {
-		((BlockSensitiveBufferBuilder) arg2).endEntity();
+		if (arg2 instanceof BlockSensitiveBufferBuilder) {
+			((BlockSensitiveBufferBuilder) arg2).endEntity();
+		}
 	}
 }

@@ -29,7 +29,7 @@ public class IrisVertexFormats {
 		terrainElements.add(DefaultVertexFormat.ELEMENT_UV2);
 		terrainElements.add(DefaultVertexFormat.ELEMENT_NORMAL);
 		terrainElements.add(DefaultVertexFormat.ELEMENT_PADDING);
-		terrainElements.add(VELOCITY_ELEMENT);
+		terrainElements.add(ENTITY_ELEMENT);
 		terrainElements.add(MID_TEXTURE_ELEMENT);
 		terrainElements.add(TANGENT_ELEMENT);
 
@@ -40,7 +40,7 @@ public class IrisVertexFormats {
 		entityElements.add(DefaultVertexFormat.ELEMENT_UV2);
 		entityElements.add(DefaultVertexFormat.ELEMENT_NORMAL);
 		entityElements.add(DefaultVertexFormat.ELEMENT_PADDING);
-		entityElements.add(ENTITY_ELEMENT);
+		entityElements.add(VELOCITY_ELEMENT);
 		entityElements.add(MID_TEXTURE_ELEMENT);
 		entityElements.add(TANGENT_ELEMENT);
 
