@@ -611,6 +611,7 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 		builder.bindAttributeLocation(11, "mc_Entity");
 		builder.bindAttributeLocation(12, "mc_midTexCoord");
 		builder.bindAttributeLocation(13, "at_tangent");
+		builder.bindAttributeLocation(14, "at_velocity");
 
 		AlphaTestOverride alphaTestOverride = programDirectives.getAlphaTestOverride().orElse(null);
 

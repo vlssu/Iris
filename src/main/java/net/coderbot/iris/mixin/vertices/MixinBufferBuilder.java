@@ -9,6 +9,7 @@ import net.coderbot.iris.block_rendering.BlockRenderingSettings;
 import net.coderbot.iris.vendored.joml.Vector3f;
 import net.coderbot.iris.vertices.BlockSensitiveBufferBuilder;
 import net.coderbot.iris.vertices.BufferBuilderPolygonView;
+import net.coderbot.iris.vertices.EntityVelocity;
 import net.coderbot.iris.vertices.ExtendingBufferBuilder;
 import net.coderbot.iris.vertices.IrisVertexFormats;
 import net.coderbot.iris.vertices.NormalHelper;
@@ -28,6 +29,9 @@ import java.nio.ByteBuffer;
  */
 @Mixin(BufferBuilder.class)
 public abstract class MixinBufferBuilder implements BufferVertexConsumer, BlockSensitiveBufferBuilder, ExtendingBufferBuilder {
+	private static final EntityVelocity EMPTY_VELOCITY = new EntityVelocity();
+
+
 	@Unique
 	private boolean extending;
 
@@ -39,6 +43,9 @@ public abstract class MixinBufferBuilder implements BufferVertexConsumer, BlockS
 
 	@Unique
 	private final Vector3f normal = new Vector3f();
+
+	@Unique
+	private EntityVelocity velocity = EMPTY_VELOCITY;
 
 	@Unique
 	private boolean injectNormal;
@@ -75,6 +82,9 @@ public abstract class MixinBufferBuilder implements BufferVertexConsumer, BlockS
 
 	@Shadow
 	public abstract void putShort(int i, short s);
+
+	@Shadow
+	public abstract void putFloat(int i, float f);
 
 	@Unique
 	private boolean iris$shouldNotExtend = false;
@@ -135,8 +145,15 @@ public abstract class MixinBufferBuilder implements BufferVertexConsumer, BlockS
 			this.nextElement();
 		}
 
-		this.putShort(0, currentBlock);
-		this.putShort(2, currentRenderType);
+
+		if (this.format == IrisVertexFormats.TERRAIN) {
+			this.putShort(0, currentBlock);
+			this.putShort(2, currentRenderType);
+		} else {
+			this.putFloat(0, velocity.getVelX());
+			this.putFloat(4, velocity.getVelY());
+			this.putFloat(8, velocity.getVelZ());
+		}
 		this.nextElement();
 		this.putFloat(0, 0);
 		this.putFloat(4, 0);
@@ -168,7 +185,12 @@ public abstract class MixinBufferBuilder implements BufferVertexConsumer, BlockS
 		vertexCount = 0;
 
 		// TODO: Keep this in sync with the extensions
-		int extendedDataLength = (2 * 2) + (2 * 4) + (1 * 4);
+		int extendedDataLength;
+		if (this.format == IrisVertexFormats.TERRAIN) {
+			extendedDataLength = (2 * 2) + (2 * 4) + (1 * 4);
+		} else {
+			extendedDataLength = (3 * 4) + (2 * 4) + (1 * 4);
+		}
 
 		int stride = this.format.getVertexSize();
 
@@ -200,6 +222,16 @@ public abstract class MixinBufferBuilder implements BufferVertexConsumer, BlockS
 			buffer.putInt(nextElementByte - 4 - extendedDataLength - stride * vertex, packedNormal);
 			buffer.putInt(nextElementByte - 4 - stride * vertex, tangent);
 		}
+	}
+
+	@Override
+	public void beginEntity(EntityVelocity velocity) {
+		this.velocity = velocity;
+	}
+
+	@Override
+	public void endEntity() {
+		this.velocity = EMPTY_VELOCITY;
 	}
 
 	@Unique

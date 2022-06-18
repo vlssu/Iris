@@ -31,6 +31,7 @@
     "MixinMinecraft_NoAuthInDev",
     "MixinMinecraft_PipelineManagement",
     "MixinModelViewBobbing",
+    "MixinModelPart",
     "MixinOptions_Entrypoint",
     "MixinParticleEngine",
     "MixinRenderSystem",
