@@ -19,9 +19,17 @@ public class EntityVelocity {
 	}
 
 	public void setPos(float x, float y, float z) {
-		this.velX = x - posX;
-		this.velY = y - posY;
-		this.velZ = z - posZ;
+		if (posX != 0) {
+			this.velX = x - posX;
+		}
+
+		if (posY != 0) {
+			this.velY = y - posY;
+		}
+
+		if (posZ != 0) {
+			this.velZ = z - posZ;
+		}
 
 		this.posX = x;
 		this.posY = y;

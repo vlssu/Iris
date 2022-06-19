@@ -121,9 +121,10 @@ public abstract class MixinBufferBuilder implements BufferVertexConsumer, BlockS
 	@Inject(method = "vertex", at = @At("HEAD"))
 	private void setVelocity(float f, float g, float h, float i, float j, float k, float l, float m, float n, int o, int p, float q, float r, float s, CallbackInfo ci) {
 		if (this.velocity != EMPTY_VELOCITY) {
-			this.velocity.setPos(f ,g, h);
+			//this.velocity.setPos(f ,g, h);
 		}
 	}
+
 	@Inject(method = "discard", at = @At("HEAD"))
 	private void iris$onReset(CallbackInfo ci) {
 		extending = false;

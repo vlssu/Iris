@@ -32,6 +32,7 @@
     "MixinMinecraft_PipelineManagement",
     "MixinModelViewBobbing",
     "MixinModelPart",
+    "MixinModelPartCube",
     "MixinOptions_Entrypoint",
     "MixinParticleEngine",
     "MixinRenderSystem",
