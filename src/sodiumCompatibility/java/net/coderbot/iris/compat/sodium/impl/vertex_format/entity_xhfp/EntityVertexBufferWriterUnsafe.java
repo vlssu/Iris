@@ -6,13 +6,15 @@ import me.jellysquid.mods.sodium.client.model.vertex.formats.glyph.GlyphVertexSi
 import me.jellysquid.mods.sodium.client.model.vertex.formats.quad.QuadVertexSink;
 import me.jellysquid.mods.sodium.client.util.Norm3b;
 import net.coderbot.iris.vendored.joml.Vector3f;
+import net.coderbot.iris.vertices.EntityVelocity;
 import net.coderbot.iris.vertices.IrisVertexFormats;
 import net.coderbot.iris.vertices.NormalHelper;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import org.lwjgl.system.MemoryUtil;
 
-public class EntityVertexBufferWriterUnsafe extends VertexBufferWriterUnsafe implements QuadVertexSink, GlyphVertexSink {
+public class EntityVertexBufferWriterUnsafe extends VertexBufferWriterUnsafe implements QuadVertexSink, GlyphVertexSink, EntityVertexWriter {
 	private static final int STRIDE = IrisVertexFormats.ENTITY.getVertexSize();
+	private static final EntityVelocity EMPTY_VELOCITY = new EntityVelocity();
 
 	private final QuadViewEntity.QuadViewEntityUnsafe quad = new QuadViewEntity.QuadViewEntityUnsafe();
 	private final Vector3f saveNormal = new Vector3f();
@@ -20,6 +22,7 @@ public class EntityVertexBufferWriterUnsafe extends VertexBufferWriterUnsafe imp
 	private int vertexCount;
 	private float uSum;
 	private float vSum;
+	private EntityVelocity velocity = EMPTY_VELOCITY;
 
 	public EntityVertexBufferWriterUnsafe(VertexBufferView backingBuffer) {
 		super(backingBuffer, ExtendedQuadVertexType.INSTANCE);
@@ -41,8 +44,9 @@ public class EntityVertexBufferWriterUnsafe extends VertexBufferWriterUnsafe imp
 		MemoryUtil.memPutFloat(i + 20, v);
 		MemoryUtil.memPutInt(i + 24, overlay);
 		MemoryUtil.memPutInt(i + 28, light);
-		MemoryUtil.memPutShort(i + 36, (short) -1);
-		MemoryUtil.memPutShort(i + 38, (short) -1);
+		MemoryUtil.memPutFloat(i + 36, velocity.getVelX());
+		MemoryUtil.memPutFloat(i + 40, velocity.getVelY());
+		MemoryUtil.memPutFloat(i + 44, velocity.getVelZ());
 
 		if (vertexCount == 4) {
 			this.endQuad(normal);
@@ -83,13 +87,23 @@ public class EntityVertexBufferWriterUnsafe extends VertexBufferWriterUnsafe imp
 		int tangent = NormalHelper.computeTangent(normalX, normalY, normalZ, quad);
 
 		for (long vertex = 0; vertex < 4; vertex++) {
-			MemoryUtil.memPutFloat(i + 40 - STRIDE * vertex, uSum);
-			MemoryUtil.memPutFloat(i + 44 - STRIDE * vertex, vSum);
+			MemoryUtil.memPutFloat(i + 48 - STRIDE * vertex, uSum);
+			MemoryUtil.memPutFloat(i + 52 - STRIDE * vertex, vSum);
 			MemoryUtil.memPutInt(i + 32 - STRIDE * vertex, normal);
-			MemoryUtil.memPutInt(i + 48 - STRIDE * vertex, tangent);
+			MemoryUtil.memPutInt(i + 56 - STRIDE * vertex, tangent);
 		}
 
 		uSum = 0;
 		vSum = 0;
+	}
+
+	@Override
+	public void setVelocity(EntityVelocity velocity) {
+		this.velocity = velocity;
+	}
+
+	@Override
+	public void resetVelocity() {
+		this.velocity = EMPTY_VELOCITY;
 	}
 }

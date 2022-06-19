@@ -6,14 +6,16 @@ import me.jellysquid.mods.sodium.client.model.vertex.formats.glyph.GlyphVertexSi
 import me.jellysquid.mods.sodium.client.model.vertex.formats.quad.QuadVertexSink;
 import me.jellysquid.mods.sodium.client.util.Norm3b;
 import net.coderbot.iris.vendored.joml.Vector3f;
+import net.coderbot.iris.vertices.EntityVelocity;
 import net.coderbot.iris.vertices.IrisVertexFormats;
 import net.coderbot.iris.vertices.NormalHelper;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 
 import java.nio.ByteBuffer;
 
-public class EntityVertexBufferWriterNio extends VertexBufferWriterNio implements QuadVertexSink, GlyphVertexSink {
+public class EntityVertexBufferWriterNio extends VertexBufferWriterNio implements QuadVertexSink, GlyphVertexSink, EntityVertexWriter {
 	private static final int STRIDE = IrisVertexFormats.ENTITY.getVertexSize();
+	private static final EntityVelocity EMPTY_VELOCITY = new EntityVelocity();
 
 	private final QuadViewEntity.QuadViewEntityNio quad = new QuadViewEntity.QuadViewEntityNio();
 	private final Vector3f saveNormal = new Vector3f();
@@ -21,6 +23,7 @@ public class EntityVertexBufferWriterNio extends VertexBufferWriterNio implement
 	private int vertexCount;
 	private float uSum;
 	private float vSum;
+	private EntityVelocity velocity = EMPTY_VELOCITY;
 
 	public EntityVertexBufferWriterNio(VertexBufferView backingBuffer) {
 		super(backingBuffer, ExtendedQuadVertexType.INSTANCE);
@@ -45,6 +48,9 @@ public class EntityVertexBufferWriterNio extends VertexBufferWriterNio implement
 		buffer.putInt(i + 28, light);
 		buffer.putShort(i + 36, (short) -1);
 		buffer.putShort(i + 38, (short) -1);
+		buffer.putFloat(i + 48, velocity.getVelX());
+		buffer.putFloat(i + 52, velocity.getVelY());
+		buffer.putFloat(i + 56, velocity.getVelZ());
 
 		if (vertexCount == 4) {
 			this.endQuad(normal);
@@ -94,5 +100,15 @@ public class EntityVertexBufferWriterNio extends VertexBufferWriterNio implement
 
 		uSum = 0;
 		vSum = 0;
+	}
+
+	@Override
+	public void setVelocity(EntityVelocity velocity) {
+		this.velocity = velocity;
+	}
+
+	@Override
+	public void resetVelocity() {
+		this.velocity = EMPTY_VELOCITY;
 	}
 }

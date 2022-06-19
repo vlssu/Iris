@@ -18,9 +18,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
 
-@Mixin(ModelPart.class)
+@Mixin(value = ModelPart.class, priority = 1001)
 public class MixinModelPart {
-	@Inject(method = "compile", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/VertexConsumer;vertex(FFFFFFFFFIIFFF)V"), locals = LocalCapture.CAPTURE_FAILHARD)
+	@Inject(method = "compile", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/VertexConsumer;vertex(FFFFFFFFFIIFFF)V"), locals = LocalCapture.CAPTURE_FAILHARD, require = 0)
 	private void setModelPart(PoseStack.Pose arg, VertexConsumer arg2, int i, int j, float f, float g, float h, float k, CallbackInfo ci, Matrix4f lv, Matrix3f lv2, ObjectListIterator var11, ModelPart.Cube lv3, ModelPart.Polygon[] var13, int var14, int var15, ModelPart.Polygon lv4, Vector3f lv5, float l, float m, float n, int o, ModelPart.Vertex lv6, float p, float q, float r, Vector4f lv7) {
 		((EntityVelocityInterface) lv3).getEntityVelocity()[var15][o].setPos(p,q,r);
 		if (arg2 instanceof BlockSensitiveBufferBuilder) {
@@ -28,7 +28,7 @@ public class MixinModelPart {
 		}
 	}
 
-	@Inject(method = "compile", at = @At(value = "TAIL"))
+	@Inject(method = "compile", at = @At(value = "TAIL"), require = 0)
 	private void resetModelPart(PoseStack.Pose arg, VertexConsumer arg2, int i, int j, float f, float g, float h, float k, CallbackInfo ci) {
 		if (arg2 instanceof BlockSensitiveBufferBuilder) {
 			((BlockSensitiveBufferBuilder) arg2).endEntity();

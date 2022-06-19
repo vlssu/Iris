@@ -19,6 +19,8 @@
     "options.MixinSodiumGameOptionPages",
     "options.MixinSodiumGameOptions",
     "options.MixinSodiumOptionsGUI",
+    "entity_render.MixinCube",
+    "entity_render.MixinModelPart",
     "separate_ao.MixinBlockRenderer",
     "separate_ao.MixinFluidRenderer",
     "shader_overrides.MixinChunkProgram",
