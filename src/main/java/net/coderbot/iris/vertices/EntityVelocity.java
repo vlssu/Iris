@@ -1,5 +1,8 @@
 package net.coderbot.iris.vertices;
 
+import com.mojang.math.Vector4f;
+import net.minecraft.world.phys.Vec3;
+
 public class EntityVelocity {
 	private float posX, posY, posZ;
 	private float velX, velY, velZ;
@@ -34,6 +37,10 @@ public class EntityVelocity {
 		this.posX = x;
 		this.posY = y;
 		this.posZ = z;
+	}
+
+	public void setPos(Vector4f vec4f) {
+		setPos(vec4f.x(), vec4f.y(), vec4f.z());
 	}
 
 	public float getVelX() {

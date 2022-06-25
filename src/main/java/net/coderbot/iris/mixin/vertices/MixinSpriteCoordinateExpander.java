@@ -29,7 +29,7 @@ public class MixinSpriteCoordinateExpander implements BlockSensitiveBufferBuilde
 	}
 
 	@Override
-	public void beginEntity(EntityVelocity velocity) {
+	public void beginEntity(EntityVelocity[] velocity) {
 		if (this.delegate instanceof BlockSensitiveBufferBuilder) {
 			((BlockSensitiveBufferBuilder) this.delegate).beginEntity(velocity);
 		}
