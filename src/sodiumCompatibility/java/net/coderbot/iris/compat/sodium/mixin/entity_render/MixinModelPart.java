@@ -14,6 +14,7 @@ import me.jellysquid.mods.sodium.client.util.math.Matrix3fExtended;
 import me.jellysquid.mods.sodium.client.util.math.Matrix4fExtended;
 import me.jellysquid.mods.sodium.client.util.math.MatrixUtil;
 import net.coderbot.iris.compat.sodium.impl.vertex_format.entity_xhfp.EntityVertexWriter;
+import net.coderbot.iris.shadows.ShadowRenderingState;
 import net.coderbot.iris.vertices.EntityVelocityInterface;
 import net.minecraft.client.model.geom.ModelPart;
 import org.spongepowered.asm.mixin.Final;
@@ -66,7 +67,9 @@ public class MixinModelPart {
 					float z2 = modelExt.transformVecZ(x1, y1, z1);
 
 					if (drain instanceof EntityVertexWriter) {
-						((EntityVelocityInterface) cuboid).getEntityVelocity()[polygonValue][vertexValue].setPos(x1, y1, z1);
+						if (!ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+							((EntityVelocityInterface) cuboid).getEntityVelocity()[polygonValue][vertexValue].setPos(x2, y2, z2);
+						}
 						((EntityVertexWriter) drain).setVelocity(((EntityVelocityInterface) cuboid).getEntityVelocity()[polygonValue][vertexValue]);
 					}
 

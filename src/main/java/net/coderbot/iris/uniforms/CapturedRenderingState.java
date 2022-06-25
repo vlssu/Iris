@@ -19,6 +19,7 @@ public class CapturedRenderingState {
 
 	private int currentRenderedEntity = -1;
 	private Runnable entityIdListener = null;
+	private boolean cameraTypeDirty = false;
 
 	private CapturedRenderingState() {
 	}
@@ -89,5 +90,13 @@ public class CapturedRenderingState {
 
 	public int getCurrentRenderedEntity() {
 		return currentRenderedEntity;
+	}
+
+    public void setCameraTypeDirty(boolean dirty) {
+		this.cameraTypeDirty = dirty;
+    }
+
+	public boolean isCameraTypeDirty() {
+		return cameraTypeDirty;
 	}
 }

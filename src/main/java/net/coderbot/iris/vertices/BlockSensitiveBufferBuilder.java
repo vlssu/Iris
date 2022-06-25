@@ -4,6 +4,6 @@ public interface BlockSensitiveBufferBuilder {
 	void beginBlock(short block, short renderType);
 	void endBlock();
 
-	void beginEntity(EntityVelocity[] velocity);
+	void beginEntity(EntityVelocity velocity);
 	void endEntity();
 }

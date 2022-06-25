@@ -6,7 +6,6 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormatElement;
 import net.coderbot.iris.block_rendering.BlockRenderingSettings;
-import net.coderbot.iris.shadows.ShadowRenderingState;
 import net.coderbot.iris.vendored.joml.Vector3f;
 import net.coderbot.iris.vertices.BlockSensitiveBufferBuilder;
 import net.coderbot.iris.vertices.BufferBuilderPolygonView;
@@ -30,12 +29,7 @@ import java.nio.ByteBuffer;
  */
 @Mixin(BufferBuilder.class)
 public abstract class MixinBufferBuilder implements BufferVertexConsumer, BlockSensitiveBufferBuilder, ExtendingBufferBuilder {
-	private static final EntityVelocity[] EMPTY_VELOCITY = new EntityVelocity[] {
-		new EntityVelocity(),
-		new EntityVelocity(),
-		new EntityVelocity(),
-		new EntityVelocity()
-	};
+	private static final EntityVelocity EMPTY_VELOCITY = new EntityVelocity();
 
 
 	@Unique
@@ -51,7 +45,7 @@ public abstract class MixinBufferBuilder implements BufferVertexConsumer, BlockS
 	private final Vector3f normal = new Vector3f();
 
 	@Unique
-	private EntityVelocity[] velocity = EMPTY_VELOCITY;
+	private EntityVelocity velocity = EMPTY_VELOCITY;
 
 	@Unique
 	private boolean injectNormal;
@@ -127,6 +121,7 @@ public abstract class MixinBufferBuilder implements BufferVertexConsumer, BlockS
 	@Inject(method = "vertex", at = @At("HEAD"))
 	private void setVelocity(float f, float g, float h, float i, float j, float k, float l, float m, float n, int o, int p, float q, float r, float s, CallbackInfo ci) {
 		if (this.velocity != EMPTY_VELOCITY) {
+			//this.velocity.setPos(f ,g, h);
 		}
 	}
 
@@ -162,9 +157,9 @@ public abstract class MixinBufferBuilder implements BufferVertexConsumer, BlockS
 			this.putShort(0, currentBlock);
 			this.putShort(2, currentRenderType);
 		} else {
-			this.putFloat(0, 0);
-			this.putFloat(4, 0);
-			this.putFloat(8, 0);
+			this.putFloat(0, velocity.getVelX());
+			this.putFloat(4, velocity.getVelY());
+			this.putFloat(8, velocity.getVelZ());
 		}
 		this.nextElement();
 		this.putFloat(0, 0);
@@ -214,9 +209,6 @@ public abstract class MixinBufferBuilder implements BufferVertexConsumer, BlockS
 		for (int vertex = 0; vertex < vertexAmount; vertex++) {
 			midU += polygon.u(vertex);
 			midV += polygon.v(vertex);
-			if (!ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
-				this.velocity[vertex].setPos(polygon.x(vertex), polygon.y(vertex), polygon.z(vertex));
-			}
 		}
 
 		midU /= vertexAmount;
@@ -236,16 +228,11 @@ public abstract class MixinBufferBuilder implements BufferVertexConsumer, BlockS
 			buffer.putFloat(nextElementByte - 8 - stride * vertex, midV);
 			buffer.putInt(nextElementByte - 4 - extendedDataLength - stride * vertex, packedNormal);
 			buffer.putInt(nextElementByte - 4 - stride * vertex, tangent);
-			buffer.putFloat(nextElementByte - extendedDataLength - stride * vertex, this.velocity[vertex].getVelX());
-			buffer.putFloat(nextElementByte + 4 - extendedDataLength - stride * vertex, this.velocity[vertex].getVelY());
-			buffer.putFloat(nextElementByte + 8 - extendedDataLength - stride * vertex, this.velocity[vertex].getVelZ());
 		}
-
-		this.velocity = EMPTY_VELOCITY;
 	}
 
 	@Override
-	public void beginEntity(EntityVelocity[] velocity) {
+	public void beginEntity(EntityVelocity velocity) {
 		this.velocity = velocity;
 	}
 

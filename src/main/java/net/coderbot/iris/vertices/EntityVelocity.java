@@ -1,11 +1,15 @@
 package net.coderbot.iris.vertices;
 
 import com.mojang.math.Vector4f;
+import net.coderbot.iris.mixin.LevelRendererAccessor;
+import net.coderbot.iris.uniforms.CapturedRenderingState;
+import net.minecraft.client.Minecraft;
 import net.minecraft.world.phys.Vec3;
 
 public class EntityVelocity {
 	private float posX, posY, posZ;
 	private float velX, velY, velZ;
+	private int frameId;
 
 	public static EntityVelocity[][] createMatrix() {
 		EntityVelocity[][] matrix = new EntityVelocity[6][4];
@@ -22,18 +26,29 @@ public class EntityVelocity {
 	}
 
 	public void setPos(float x, float y, float z) {
-		if (posX != 0) {
-			this.velX = x - posX;
+		if (((LevelRendererAccessor) Minecraft.getInstance().levelRenderer).getFrameId() == this.frameId) {
+			return;
 		}
 
-		if (posY != 0) {
-			this.velY = y - posY;
+		if (frameId - ((LevelRendererAccessor) Minecraft.getInstance().levelRenderer).getFrameId() < 2 && !CapturedRenderingState.INSTANCE.isCameraTypeDirty()) {
+			if (posX != 0) {
+				this.velX = x - posX;
+			}
+
+			if (posY != 0) {
+				this.velY = y - posY;
+			}
+
+			if (posZ != 0) {
+				this.velZ = z - posZ;
+			}
+		} else {
+			this.velX = 0;
+			this.velY = 0;
+			this.velZ = 0;
 		}
 
-		if (posZ != 0) {
-			this.velZ = z - posZ;
-		}
-
+		this.frameId = ((LevelRendererAccessor) Minecraft.getInstance().levelRenderer).getFrameId();
 		this.posX = x;
 		this.posY = y;
 		this.posZ = z;
