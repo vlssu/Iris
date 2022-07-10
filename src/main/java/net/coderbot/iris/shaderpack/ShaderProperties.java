@@ -17,11 +17,18 @@ import net.coderbot.iris.gl.blending.BlendModeOverride;
 import net.coderbot.iris.shaderpack.option.ShaderPackOptions;
 import net.coderbot.iris.shaderpack.preprocessor.PropertiesPreprocessor;
 import net.coderbot.iris.shaderpack.texture.TextureStage;
-import org.apache.logging.log4j.Level;
 
 import java.io.IOException;
 import java.io.StringReader;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Properties;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -38,6 +45,7 @@ public class ShaderProperties {
 	private OptionalBoolean shadowTerrain = OptionalBoolean.DEFAULT;
 	private OptionalBoolean shadowTranslucent = OptionalBoolean.DEFAULT;
 	private OptionalBoolean shadowEntities = OptionalBoolean.DEFAULT;
+	private OptionalBoolean shadowPlayer = OptionalBoolean.DEFAULT;
 	private OptionalBoolean shadowBlockEntities = OptionalBoolean.DEFAULT;
 	private OptionalBoolean underwaterOverlay = OptionalBoolean.DEFAULT;
 	private OptionalBoolean sun = OptionalBoolean.DEFAULT;
@@ -64,7 +72,7 @@ public class ShaderProperties {
 	private final Object2ObjectMap<String, AlphaTestOverride> alphaTestOverrides = new Object2ObjectOpenHashMap<>();
 	private final Object2FloatMap<String> viewportScaleOverrides = new Object2FloatOpenHashMap<>();
 	private final Object2ObjectMap<String, BlendModeOverride> blendModeOverrides = new Object2ObjectOpenHashMap<>();
-	private final Object2ObjectMap<TextureStage, Object2ObjectMap<String, String>> customTextures = new Object2ObjectOpenHashMap<>();
+	private final EnumMap<TextureStage, Object2ObjectMap<String, String>> customTextures = new EnumMap<>(TextureStage.class);
 	private final Object2ObjectMap<String, Object2BooleanMap<String>> explicitFlips = new Object2ObjectOpenHashMap<>();
 	private String noiseTexturePath = null;
 
@@ -73,8 +81,8 @@ public class ShaderProperties {
 	}
 
 	// TODO: Is there a better solution than having ShaderPack pass a root path to ShaderProperties to be able to read textures?
-	public ShaderProperties(String contents, ShaderPackOptions shaderPackOptions) {
-		String preprocessedContents = PropertiesPreprocessor.preprocessSource(contents, shaderPackOptions);
+	public ShaderProperties(String contents, ShaderPackOptions shaderPackOptions, Iterable<StringPair> environmentDefines) {
+		String preprocessedContents = PropertiesPreprocessor.preprocessSource(contents, shaderPackOptions, environmentDefines);
 
 		Properties preprocessed = new OrderBackedProperties();
 		Properties original = new OrderBackedProperties();
@@ -105,6 +113,7 @@ public class ShaderProperties {
 			handleBooleanDirective(key, value, "shadowTerrain", bool -> shadowTerrain = bool);
 			handleBooleanDirective(key, value, "shadowTranslucent", bool -> shadowTranslucent = bool);
 			handleBooleanDirective(key, value, "shadowEntities", bool -> shadowEntities = bool);
+			handleBooleanDirective(key, value, "shadowPlayer", bool -> shadowPlayer = bool);
 			handleBooleanDirective(key, value, "shadowBlockEntities", bool -> shadowBlockEntities = bool);
 			handleBooleanDirective(key, value, "underwaterOverlay", bool -> underwaterOverlay = bool);
 			handleBooleanDirective(key, value, "sun", bool -> sun = bool);
@@ -213,10 +222,8 @@ public class ShaderProperties {
 
 				TextureStage stage = optionalTextureStage.get();
 
-				Object2ObjectMap<String, String> customTexturePropertyMap = customTextures.getOrDefault(stage, new Object2ObjectOpenHashMap<>());
-				customTexturePropertyMap.put(samplerName, value);
-
-				customTextures.put(stage, customTexturePropertyMap);
+				customTextures.computeIfAbsent(stage, _stage -> new Object2ObjectOpenHashMap<>())
+						.put(samplerName, value);
 			});
 
 			handleTwoArgDirective("flip.", key, value, (pass, buffer) -> {
@@ -239,10 +246,17 @@ public class ShaderProperties {
 			// the last definition being used, should be tested if behavior matches OptiFine
 			handleWhitespacedListDirective(key, value, "sliders", sliders -> sliderOptions = sliders);
 			handlePrefixedWhitespacedListDirective("profile.", key, value, profiles::put);
+
+			if (handleIntDirective(key, value, "screen.columns", columns -> mainScreenColumnCount = columns)) {
+				return;
+			}
+
+			if (handleAffixedIntDirective("screen.", ".columns", key, value, subScreenColumnCount::put)) {
+				return;
+			}
+
 			handleWhitespacedListDirective(key, value, "screen", options -> mainScreenOptions = options);
 			handlePrefixedWhitespacedListDirective("screen.", key, value, subScreenOptions::put);
-			handleIntDirective(key, value, "screen.columns", columns -> mainScreenColumnCount = columns);
-			handleAffixedIntDirective("screen.", ".columns", key, value, subScreenColumnCount::put);
 		});
 	}
 
@@ -270,9 +284,9 @@ public class ShaderProperties {
 		}
 	}
 
-	private static void handleIntDirective(String key, String value, String expectedKey, Consumer<Integer> handler) {
+	private static boolean handleIntDirective(String key, String value, String expectedKey, Consumer<Integer> handler) {
 		if (!expectedKey.equals(key)) {
-			return;
+			return false;
 		}
 
 		try {
@@ -282,15 +296,17 @@ public class ShaderProperties {
 		} catch (NumberFormatException nex) {
 			Iris.logger.warn("Unexpected value for integer key " + key + " in shaders.properties: got " + value + ", but expected an integer");
 		}
+
+		return true;
 	}
 
-	private static void handleAffixedIntDirective(String prefix, String suffix, String key, String value, BiConsumer<String, Integer> handler) {
+	private static boolean handleAffixedIntDirective(String prefix, String suffix, String key, String value, BiConsumer<String, Integer> handler) {
 		if (key.startsWith(prefix) && key.endsWith(suffix)) {
 			int substrBegin = prefix.length();
 			int substrEnd = key.length() - suffix.length();
 
 			if (substrEnd <= substrBegin) {
-				return;
+				return false;
 			}
 
 			String affixStrippedKey = key.substring(substrBegin, substrEnd);
@@ -302,7 +318,11 @@ public class ShaderProperties {
 			} catch (NumberFormatException nex) {
 				Iris.logger.warn("Unexpected value for integer key " + key + " in shaders.properties: got " + value + ", but expected an integer");
 			}
+
+			return true;
 		}
+
+		return false;
 	}
 
 	private static void handlePassDirective(String prefix, String key, String value, Consumer<String> handler) {
@@ -372,6 +392,10 @@ public class ShaderProperties {
 
 	public OptionalBoolean getShadowEntities() {
 		return shadowEntities;
+	}
+
+	public OptionalBoolean getShadowPlayer() {
+		return shadowPlayer;
 	}
 
 	public OptionalBoolean getShadowBlockEntities() {
@@ -446,7 +470,7 @@ public class ShaderProperties {
 		return blendModeOverrides;
 	}
 
-	public Object2ObjectMap<TextureStage, Object2ObjectMap<String, String>> getCustomTextures() {
+	public EnumMap<TextureStage, Object2ObjectMap<String, String>> getCustomTextures() {
 		return customTextures;
 	}
 

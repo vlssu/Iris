@@ -17,7 +17,7 @@ You need java, please get it from: [Adoptium.net](https://adoptium.net/?variant=
 
 ## How can I configure my shaders?
 
-[#663](https://github.com/IrisShaders/Iris/issues/663)
+Go to Options>Video Settings>Shader Packs>Shader Pack Settings.
 
 ## Is my system supported?
 
@@ -64,7 +64,7 @@ Dynamic Lights - [LambDynamicLights](https://www.curseforge.com/minecraft/mc-mod
 
 Smart Leaves - [Cull Leaves](https://www.curseforge.com/minecraft/mc-mods/cull-leaves)
 
-Performance - Iris already requires [Sodium](https://modrinth.com/mod/sodium), but we also recommend [Lithium](https://modrinth.com/mod/lithium), [Hydrogen](https://modrinth.com/mod/hydrogen), and [FerriteCore](https://www.curseforge.com/minecraft/mc-mods/ferritecore-fabric). You can also use either [Phosphor](https://modrinth.com/mod/phosphor) or [Starlight](https://modrinth.com/mod/starlight). Phosphor does not have a 1.18 version yet.
+Performance - Iris already requires [Sodium](https://modrinth.com/mod/sodium), but we also recommend [Lithium](https://modrinth.com/mod/lithium), [Hydrogen](https://modrinth.com/mod/hydrogen), and [FerriteCore](https://www.curseforge.com/minecraft/mc-mods/ferritecore-fabric). You can also use either [Phosphor](https://modrinth.com/mod/phosphor) or [Starlight](https://modrinth.com/mod/starlight).
 
 Various OptiFine features including toggles for animations, particles, and fog - [Sodium Extra](https://www.curseforge.com/minecraft/mc-mods/sodium-extra)
 
