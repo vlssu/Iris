@@ -8,15 +8,11 @@ public class InvertMat4fDerivation {
 	private final Matrix4f tmp = new Matrix4f();
 
 	public void apply(UniformValues values) {
-		if (!values.isDirty(srcHandle)) {
-			return;
-		}
-
-		values.loadMat4f(tmp, srcHandle);
+		values.loadMat4f(srcHandle, tmp);
 
 		tmp.invert();
 
-		values.storeMat4f(tmp, dstHandle);
+		values.storeMat4f(dstHandle, tmp);
 	}
 
 	@Override
