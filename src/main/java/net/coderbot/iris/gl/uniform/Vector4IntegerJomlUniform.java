@@ -1,8 +1,8 @@
 package net.coderbot.iris.gl.uniform;
 
 import net.coderbot.iris.gl.IrisRenderSystem;
+import net.coderbot.iris.gl.state.ValueUpdateNotifier;
 import net.coderbot.iris.vendored.joml.Vector4i;
-import org.lwjgl.opengl.GL20;
 
 import java.util.function.Supplier;
 

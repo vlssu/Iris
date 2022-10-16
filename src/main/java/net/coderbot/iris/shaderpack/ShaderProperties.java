@@ -8,20 +8,30 @@ import it.unimi.dsi.fastutil.objects.Object2FloatOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.coderbot.iris.Iris;
+import net.coderbot.iris.gl.IrisRenderSystem;
 import net.coderbot.iris.gl.blending.AlphaTest;
 import net.coderbot.iris.gl.blending.AlphaTestFunction;
 import net.coderbot.iris.gl.blending.AlphaTestOverride;
 import net.coderbot.iris.gl.blending.BlendMode;
 import net.coderbot.iris.gl.blending.BlendModeFunction;
 import net.coderbot.iris.gl.blending.BlendModeOverride;
+import net.coderbot.iris.gl.texture.TextureScaleOverride;
+import net.coderbot.iris.gl.blending.BufferBlendInformation;
 import net.coderbot.iris.shaderpack.option.ShaderPackOptions;
 import net.coderbot.iris.shaderpack.preprocessor.PropertiesPreprocessor;
 import net.coderbot.iris.shaderpack.texture.TextureStage;
-import org.apache.logging.log4j.Level;
 
 import java.io.IOException;
 import java.io.StringReader;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Properties;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -31,13 +41,14 @@ import java.util.function.Consumer;
  * values in here & the values parsed from shader source code.
  */
 public class ShaderProperties {
-	private boolean enableClouds = true;
+	private CloudSetting cloudSetting = CloudSetting.DEFAULT;
 	private OptionalBoolean oldHandLight = OptionalBoolean.DEFAULT;
 	private OptionalBoolean dynamicHandLight = OptionalBoolean.DEFAULT;
 	private OptionalBoolean oldLighting = OptionalBoolean.DEFAULT;
 	private OptionalBoolean shadowTerrain = OptionalBoolean.DEFAULT;
 	private OptionalBoolean shadowTranslucent = OptionalBoolean.DEFAULT;
 	private OptionalBoolean shadowEntities = OptionalBoolean.DEFAULT;
+	private OptionalBoolean shadowPlayer = OptionalBoolean.DEFAULT;
 	private OptionalBoolean shadowBlockEntities = OptionalBoolean.DEFAULT;
 	private OptionalBoolean underwaterOverlay = OptionalBoolean.DEFAULT;
 	private OptionalBoolean sun = OptionalBoolean.DEFAULT;
@@ -48,14 +59,16 @@ public class ShaderProperties {
 	private OptionalBoolean backFaceCutoutMipped = OptionalBoolean.DEFAULT;
 	private OptionalBoolean backFaceTranslucent = OptionalBoolean.DEFAULT;
 	private OptionalBoolean rainDepth = OptionalBoolean.DEFAULT;
+	private OptionalBoolean concurrentCompute = OptionalBoolean.DEFAULT;
 	private OptionalBoolean beaconBeamDepth = OptionalBoolean.DEFAULT;
 	private OptionalBoolean separateAo = OptionalBoolean.DEFAULT;
 	private OptionalBoolean frustumCulling = OptionalBoolean.DEFAULT;
 	private OptionalBoolean shadowCulling = OptionalBoolean.DEFAULT;
 	private OptionalBoolean particlesBeforeDeferred = OptionalBoolean.DEFAULT;
+	private OptionalBoolean prepareBeforeShadow = OptionalBoolean.DEFAULT;
 	private List<String> sliderOptions = new ArrayList<>();
 	private final Map<String, List<String>> profiles = new LinkedHashMap<>();
-	private List<String> mainScreenOptions = new ArrayList<>();
+	private List<String> mainScreenOptions = null;
 	private final Map<String, List<String>> subScreenOptions = new HashMap<>();
 	private Integer mainScreenColumnCount = null;
 	private final Map<String, Integer> subScreenColumnCount = new HashMap<>();
@@ -63,18 +76,23 @@ public class ShaderProperties {
 	// TODO: Parse custom uniforms / variables
 	private final Object2ObjectMap<String, AlphaTestOverride> alphaTestOverrides = new Object2ObjectOpenHashMap<>();
 	private final Object2FloatMap<String> viewportScaleOverrides = new Object2FloatOpenHashMap<>();
+	private final Object2ObjectMap<String, TextureScaleOverride> textureScaleOverrides = new Object2ObjectOpenHashMap<>();
 	private final Object2ObjectMap<String, BlendModeOverride> blendModeOverrides = new Object2ObjectOpenHashMap<>();
-	private final Object2ObjectMap<TextureStage, Object2ObjectMap<String, String>> customTextures = new Object2ObjectOpenHashMap<>();
+	private final Object2ObjectMap<String, ArrayList<BufferBlendInformation>> bufferBlendOverrides = new Object2ObjectOpenHashMap<>();
+	private final EnumMap<TextureStage, Object2ObjectMap<String, String>> customTextures = new EnumMap<>(TextureStage.class);
 	private final Object2ObjectMap<String, Object2BooleanMap<String>> explicitFlips = new Object2ObjectOpenHashMap<>();
 	private String noiseTexturePath = null;
+	private Object2ObjectMap<String, String> conditionallyEnabledPrograms = new Object2ObjectOpenHashMap<>();
+	private List<String> requiredFeatureFlags = new ArrayList<>();
+	private List<String> optionalFeatureFlags = new ArrayList<>();
 
 	private ShaderProperties() {
 		// empty
 	}
 
 	// TODO: Is there a better solution than having ShaderPack pass a root path to ShaderProperties to be able to read textures?
-	public ShaderProperties(String contents, ShaderPackOptions shaderPackOptions) {
-		String preprocessedContents = PropertiesPreprocessor.preprocessSource(contents, shaderPackOptions);
+	public ShaderProperties(String contents, ShaderPackOptions shaderPackOptions, Iterable<StringPair> environmentDefines) {
+		String preprocessedContents = PropertiesPreprocessor.preprocessSource(contents, shaderPackOptions, environmentDefines);
 
 		Properties preprocessed = new OrderBackedProperties();
 		Properties original = new OrderBackedProperties();
@@ -94,9 +112,16 @@ public class ShaderProperties {
 				return;
 			}
 
-			if ("clouds".equals(key) && value.equals("off")) {
-				// TODO: Force clouds to fast / fancy as well if the shaderpack wants it
-				enableClouds = false;
+			if ("clouds".equals(key)) {
+				if ("off".equals(value)) {
+					cloudSetting = CloudSetting.OFF;
+				} else if ("fast".equals(value)) {
+					cloudSetting = CloudSetting.FAST;
+				} else if ("fancy".equals(value)) {
+					cloudSetting = CloudSetting.FANCY;
+				} else {
+					Iris.logger.error("Unrecognized clouds setting: " + value);
+				}
 			}
 
 			handleBooleanDirective(key, value, "oldHandLight", bool -> oldHandLight = bool);
@@ -105,6 +130,7 @@ public class ShaderProperties {
 			handleBooleanDirective(key, value, "shadowTerrain", bool -> shadowTerrain = bool);
 			handleBooleanDirective(key, value, "shadowTranslucent", bool -> shadowTranslucent = bool);
 			handleBooleanDirective(key, value, "shadowEntities", bool -> shadowEntities = bool);
+			handleBooleanDirective(key, value, "shadowPlayer", bool -> shadowPlayer = bool);
 			handleBooleanDirective(key, value, "shadowBlockEntities", bool -> shadowBlockEntities = bool);
 			handleBooleanDirective(key, value, "underwaterOverlay", bool -> underwaterOverlay = bool);
 			handleBooleanDirective(key, value, "sun", bool -> sun = bool);
@@ -115,11 +141,13 @@ public class ShaderProperties {
 			handleBooleanDirective(key, value, "backFace.cutoutMipped", bool -> backFaceCutoutMipped = bool);
 			handleBooleanDirective(key, value, "backFace.translucent", bool -> backFaceTranslucent = bool);
 			handleBooleanDirective(key, value, "rain.depth", bool -> rainDepth = bool);
+			handleBooleanDirective(key, value, "allowConcurrentCompute", bool -> concurrentCompute = bool);
 			handleBooleanDirective(key, value, "beacon.beam.depth", bool -> beaconBeamDepth = bool);
 			handleBooleanDirective(key, value, "separateAo", bool -> separateAo = bool);
 			handleBooleanDirective(key, value, "frustum.culling", bool -> frustumCulling = bool);
 			handleBooleanDirective(key, value, "shadow.culling", bool -> shadowCulling = bool);
 			handleBooleanDirective(key, value, "particles.before.deferred", bool -> particlesBeforeDeferred = bool);
+			handleBooleanDirective(key, value, "prepareBeforeShadow", bool -> prepareBeforeShadow = bool);
 
 			// TODO: Min optifine versions, shader options layout / appearance / profiles
 			// TODO: Custom uniforms
@@ -135,6 +163,17 @@ public class ShaderProperties {
 				}
 
 				viewportScaleOverrides.put(pass, scale);
+			});
+
+			handlePassDirective("size.buffer.", key, value, pass -> {
+				String[] parts = value.split(" ");
+
+				if (parts.length != 2) {
+					Iris.logger.error("Unable to parse size.buffer directive for " + pass + ": " + value);
+					return;
+				}
+
+				textureScaleOverrides.put(pass, new TextureScaleOverride(parts[0], parts[1]));
 			});
 
 			handlePassDirective("alphaTest.", key, value, pass -> {
@@ -173,8 +212,44 @@ public class ShaderProperties {
 
 			handlePassDirective("blend.", key, value, pass -> {
 				if (pass.contains(".")) {
-					// TODO: Support per-buffer blending directives (glBlendFuncSeparateI)
-					Iris.logger.warn("Per-buffer pass blending directives are not supported, ignoring blend directive for " + key);
+
+					if (!IrisRenderSystem.supportsBufferBlending()) {
+						throw new RuntimeException("Buffer blending is not supported on this platform, however it was attempted to be used!");
+					}
+
+					String[] parts = pass.split("\\.");
+					int index = PackRenderTargetDirectives.LEGACY_RENDER_TARGETS.indexOf(parts[1]);
+
+					if (index == -1 && parts[1].startsWith("colortex")) {
+						String id = parts[1].substring("colortex".length());
+
+						try {
+							index = Integer.parseInt(id);
+						} catch (NumberFormatException e) {
+							throw new RuntimeException("Failed to parse buffer blend!", e);
+						}
+					}
+
+					if (index == -1) {
+						throw new RuntimeException("Failed to parse buffer blend! index = " + index);
+					}
+
+					if ("off".equals(value)) {
+						bufferBlendOverrides.computeIfAbsent(parts[0], list -> new ArrayList<>()).add(new BufferBlendInformation(index, null));
+						return;
+					}
+
+					String[] modeArray = value.split(" ");
+					int[] modes = new int[modeArray.length];
+
+					int i = 0;
+					for (String modeName : modeArray) {
+						modes[i] = BlendModeFunction.fromString(modeName).get().getGlId();
+						i++;
+					}
+
+					bufferBlendOverrides.computeIfAbsent(parts[0], list -> new ArrayList<>()).add(new BufferBlendInformation(index, new BlendMode(modes[0], modes[1], modes[2], modes[3])));
+
 					return;
 				}
 
@@ -184,7 +259,7 @@ public class ShaderProperties {
 				}
 
 				String[] modeArray = value.split(" ");
-				int[] modes = new int[4];
+				int[] modes = new int[modeArray.length];
 
 				int i = 0;
 				for (String modeName : modeArray) {
@@ -193,6 +268,10 @@ public class ShaderProperties {
 				}
 
 				blendModeOverrides.put(pass, new BlendModeOverride(new BlendMode(modes[0], modes[1], modes[2], modes[3])));
+			});
+
+			handleProgramEnabledDirective("program.", key, value, program -> {
+				conditionallyEnabledPrograms.put(program, value);
 			});
 
 			handleTwoArgDirective("texture.", key, value, (stageName, samplerName) -> {
@@ -213,10 +292,8 @@ public class ShaderProperties {
 
 				TextureStage stage = optionalTextureStage.get();
 
-				Object2ObjectMap<String, String> customTexturePropertyMap = customTextures.getOrDefault(stage, new Object2ObjectOpenHashMap<>());
-				customTexturePropertyMap.put(samplerName, value);
-
-				customTextures.put(stage, customTexturePropertyMap);
+				customTextures.computeIfAbsent(stage, _stage -> new Object2ObjectOpenHashMap<>())
+						.put(samplerName, value);
 			});
 
 			handleTwoArgDirective("flip.", key, value, (pass, buffer) -> {
@@ -225,6 +302,10 @@ public class ShaderProperties {
 							.put(buffer, shouldFlip);
 				});
 			});
+
+
+			handleWhitespacedListDirective(key, value, "iris.features.required", options -> requiredFeatureFlags = options);
+			handleWhitespacedListDirective(key, value, "iris.features.optional", options -> optionalFeatureFlags = options);
 
 			// TODO: Buffer size directives
 			// TODO: Conditional program enabling directives
@@ -326,6 +407,14 @@ public class ShaderProperties {
 		}
 	}
 
+	private static void handleProgramEnabledDirective(String prefix, String key, String value, Consumer<String> handler) {
+		if (key.startsWith(prefix)) {
+			String program = key.substring(prefix.length(), key.indexOf(".", prefix.length()));
+
+			handler.accept(program);
+		}
+	}
+
 	private static void handleWhitespacedListDirective(String key, String value, String expectedKey, Consumer<List<String>> handler) {
 		if (!expectedKey.equals(key)) {
 			return;
@@ -359,8 +448,8 @@ public class ShaderProperties {
 		return new ShaderProperties();
 	}
 
-	public boolean areCloudsEnabled() {
-		return enableClouds;
+	public CloudSetting getCloudSetting() {
+		return cloudSetting;
 	}
 
 	public OptionalBoolean getOldHandLight() {
@@ -385,6 +474,10 @@ public class ShaderProperties {
 
 	public OptionalBoolean getShadowEntities() {
 		return shadowEntities;
+	}
+
+	public OptionalBoolean getShadowPlayer() {
+		return shadowPlayer;
 	}
 
 	public OptionalBoolean getShadowBlockEntities() {
@@ -447,6 +540,14 @@ public class ShaderProperties {
 		return particlesBeforeDeferred;
 	}
 
+	public OptionalBoolean getConcurrentCompute() {
+		return concurrentCompute;
+	}
+
+	public OptionalBoolean getPrepareBeforeShadow() {
+		return prepareBeforeShadow;
+	}
+
 	public Object2ObjectMap<String, AlphaTestOverride> getAlphaTestOverrides() {
 		return alphaTestOverrides;
 	}
@@ -455,16 +556,28 @@ public class ShaderProperties {
 		return viewportScaleOverrides;
 	}
 
+	public Object2ObjectMap<String, TextureScaleOverride> getTextureScaleOverrides() {
+		return textureScaleOverrides;
+	}
+
 	public Object2ObjectMap<String, BlendModeOverride> getBlendModeOverrides() {
 		return blendModeOverrides;
 	}
 
-	public Object2ObjectMap<TextureStage, Object2ObjectMap<String, String>> getCustomTextures() {
+	public Object2ObjectMap<String, ArrayList<BufferBlendInformation>> getBufferBlendOverrides() {
+		return bufferBlendOverrides;
+	}
+
+	public EnumMap<TextureStage, Object2ObjectMap<String, String>> getCustomTextures() {
 		return customTextures;
 	}
 
 	public Optional<String> getNoiseTexturePath() {
 		return Optional.ofNullable(noiseTexturePath);
+	}
+
+	public Object2ObjectMap<String, String> getConditionallyEnabledPrograms() {
+		return conditionallyEnabledPrograms;
 	}
 
 	public List<String> getSliderOptions() {
@@ -475,8 +588,8 @@ public class ShaderProperties {
 		return profiles;
 	}
 
-	public List<String> getMainScreenOptions() {
-		return mainScreenOptions;
+	public Optional<List<String>> getMainScreenOptions() {
+		return Optional.ofNullable(mainScreenOptions);
 	}
 
 	public Map<String, List<String>> getSubScreenOptions() {
@@ -493,5 +606,13 @@ public class ShaderProperties {
 
 	public Object2ObjectMap<String, Object2BooleanMap<String>> getExplicitFlips() {
 		return explicitFlips;
+	}
+
+	public List<String> getRequiredFeatureFlags() {
+		return requiredFeatureFlags;
+	}
+
+	public List<String> getOptionalFeatureFlags() {
+		return optionalFeatureFlags;
 	}
 }

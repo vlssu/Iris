@@ -7,7 +7,6 @@ import net.coderbot.iris.gl.image.ImageBinding;
 import net.coderbot.iris.gl.image.ImageHolder;
 import net.coderbot.iris.gl.image.ImageLimits;
 import net.coderbot.iris.gl.texture.InternalTextureFormat;
-import org.lwjgl.opengl.GL20C;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -80,6 +79,11 @@ public class ProgramImages {
 					throw new IllegalStateException("No more available texture units while activating image " + name + "." +
 							" Only " + maxImageUnits + " image units are available.");
 				}
+			}
+
+			if (internalFormat == InternalTextureFormat.RGBA) {
+				// Internal detail of Optifine: Set RGBA8 if RGBA is selected, as RGBA is not valid for images.
+				internalFormat = InternalTextureFormat.RGBA8;
 			}
 
 			images.add(new ImageBinding(nextImageUnit, internalFormat.getGlFormat(), textureID));

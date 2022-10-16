@@ -1,13 +1,5 @@
 package net.coderbot.iris.gl.program;
 
-import java.nio.IntBuffer;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.OptionalInt;
-
 import com.google.common.collect.ImmutableList;
 import com.mojang.blaze3d.platform.GlStateManager;
 import net.coderbot.iris.Iris;
@@ -17,12 +9,21 @@ import net.coderbot.iris.gl.uniform.Uniform;
 import net.coderbot.iris.gl.uniform.UniformHolder;
 import net.coderbot.iris.gl.uniform.UniformType;
 import net.coderbot.iris.gl.uniform.UniformUpdateFrequency;
-import net.coderbot.iris.gl.uniform.ValueUpdateNotifier;
+import net.coderbot.iris.gl.state.ValueUpdateNotifier;
 import net.coderbot.iris.uniforms.SystemTimeUniforms;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.ARBShaderImageLoadStore;
 import org.lwjgl.opengl.GL20C;
+import org.lwjgl.opengl.GL30C;
+
+import java.nio.IntBuffer;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.OptionalInt;
 
 public class ProgramUniforms {
 	private static ProgramUniforms active;
@@ -138,6 +139,8 @@ public class ProgramUniforms {
 
 		@Override
 		public Builder addUniform(UniformUpdateFrequency updateFrequency, Uniform uniform) {
+			Objects.requireNonNull(uniform);
+
 			switch (updateFrequency) {
 				case ONCE:
 					once.put(locations.get(uniform.getLocation()), uniform);
@@ -183,6 +186,11 @@ public class ProgramUniforms {
 
 			for (int index = 0; index < activeUniforms; index++) {
 				String name = IrisRenderSystem.getActiveUniform(program, index, 128, sizeBuf, typeBuf);
+
+				if (name.isEmpty()) {
+					// No further information available.
+					continue;
+				}
 
 				int size = sizeBuf.get(0);
 				int type = typeBuf.get(0);
@@ -256,6 +264,9 @@ public class ProgramUniforms {
 
 		@Override
 		public Builder addDynamicUniform(Uniform uniform, ValueUpdateNotifier notifier) {
+			Objects.requireNonNull(uniform);
+			Objects.requireNonNull(notifier);
+
 			dynamic.put(locations.get(uniform.getLocation()), uniform);
 			notifiersToReset.add(notifier);
 
@@ -290,11 +301,17 @@ public class ProgramUniforms {
 		} else if (type == GL20C.GL_FLOAT_VEC2) {
 			typeName = "vec2";
 		} else if (type == GL20C.GL_INT_VEC2) {
-			typeName = "vec2i";
+			typeName = "ivec2";
+		} else if (type == GL20C.GL_INT_VEC4) {
+			typeName = "ivec4";
 		} else if (type == GL20C.GL_SAMPLER_3D) {
 			typeName = "sampler3D";
 		} else if (type == GL20C.GL_SAMPLER_2D) {
 			typeName = "sampler2D";
+		} else if (type == GL30C.GL_UNSIGNED_INT_SAMPLER_2D) {
+			typeName = "usampler2D";
+		} else if (type == GL30C.GL_UNSIGNED_INT_SAMPLER_3D) {
+			typeName = "usampler3D";
 		} else if (type == GL20C.GL_SAMPLER_1D) {
 			typeName = "sampler1D";
 		} else if (type == GL20C.GL_SAMPLER_2D_SHADOW) {
@@ -322,7 +339,7 @@ public class ProgramUniforms {
 		} else if (type == GL20C.GL_FLOAT_VEC4) {
 			return UniformType.VEC4;
 		} else if (type == GL20C.GL_INT_VEC4) {
-			return null;
+			return UniformType.VEC4I;
 		} else if (type == GL20C.GL_FLOAT_MAT3) {
 			return null;
 		} else if (type == GL20C.GL_FLOAT_VEC3) {
@@ -339,6 +356,10 @@ public class ProgramUniforms {
 			return UniformType.INT;
 		} else if (type == GL20C.GL_SAMPLER_2D) {
 			return UniformType.INT;
+		} else if (type == GL30C.GL_UNSIGNED_INT_SAMPLER_2D) {
+			return UniformType.INT;
+		} else if (type == GL30C.GL_UNSIGNED_INT_SAMPLER_3D) {
+			return UniformType.INT;
 		} else if (type == GL20C.GL_SAMPLER_1D) {
 			return UniformType.INT;
 		} else if (type == GL20C.GL_SAMPLER_2D_SHADOW) {
@@ -353,6 +374,8 @@ public class ProgramUniforms {
 	private static boolean isSampler(int type) {
 		return type == GL20C.GL_SAMPLER_1D
 				|| type == GL20C.GL_SAMPLER_2D
+				|| type == GL30C.GL_UNSIGNED_INT_SAMPLER_2D
+				|| type == GL30C.GL_UNSIGNED_INT_SAMPLER_3D
 				|| type == GL20C.GL_SAMPLER_3D
 				|| type == GL20C.GL_SAMPLER_1D_SHADOW
 				|| type == GL20C.GL_SAMPLER_2D_SHADOW;
@@ -361,6 +384,7 @@ public class ProgramUniforms {
 	private static boolean isImage(int type) {
 		return type == ARBShaderImageLoadStore.GL_IMAGE_1D
 			|| type == ARBShaderImageLoadStore.GL_IMAGE_2D
+			|| type == ARBShaderImageLoadStore.GL_UNSIGNED_INT_IMAGE_2D
 			|| type == ARBShaderImageLoadStore.GL_IMAGE_3D
 			|| type == ARBShaderImageLoadStore.GL_IMAGE_1D_ARRAY
 			|| type == ARBShaderImageLoadStore.GL_IMAGE_2D_ARRAY;

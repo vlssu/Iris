@@ -8,9 +8,9 @@ import com.google.gson.stream.JsonReader;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.coderbot.iris.Iris;
-import net.coderbot.iris.gl.program.ProgramBuilder;
-import net.coderbot.iris.gl.shader.GlShader;
-import net.coderbot.iris.gl.shader.ShaderConstants;
+import net.coderbot.iris.features.FeatureFlags;
+import net.coderbot.iris.gui.FeatureMissingErrorScreen;
+import net.coderbot.iris.gui.screen.ShaderPackScreen;
 import net.coderbot.iris.shaderpack.include.AbsolutePackPath;
 import net.coderbot.iris.shaderpack.include.IncludeGraph;
 import net.coderbot.iris.shaderpack.include.IncludeProcessor;
@@ -24,9 +24,10 @@ import net.coderbot.iris.shaderpack.preprocessor.JcppProcessor;
 import net.coderbot.iris.shaderpack.texture.CustomTextureData;
 import net.coderbot.iris.shaderpack.texture.TextureFilteringData;
 import net.coderbot.iris.shaderpack.texture.TextureStage;
-import net.coderbot.iris.shaderpack.transform.line.LineTransform;
-import net.coderbot.iris.shaderpack.transform.line.VersionDirectiveNormalizer;
-import org.apache.logging.log4j.Level;
+import net.irisshaders.iris.api.v0.IrisApi;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.TextComponent;
+import net.minecraft.network.chat.TranslatableComponent;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.BufferedReader;
@@ -38,12 +39,15 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class ShaderPack {
 	private static final Gson GSON = new Gson();
@@ -56,7 +60,7 @@ public class ShaderPack {
 
 	private final IdMap idMap;
 	private final LanguageMap languageMap;
-	private final Object2ObjectMap<TextureStage, Object2ObjectMap<String, CustomTextureData>> customTextureDataMap = new Object2ObjectOpenHashMap<>();
+	private final EnumMap<TextureStage, Object2ObjectMap<String, CustomTextureData>> customTextureDataMap = new EnumMap<>(TextureStage.class);
 	private final CustomTextureData customNoiseTexture;
 	private final ShaderPackOptions shaderPackOptions;
 	private final OptionMenuContainer menuContainer;
@@ -64,8 +68,8 @@ public class ShaderPack {
 	private final ProfileSet.ProfileResult profile;
 	private final String profileInfo;
 
-	public ShaderPack(Path root) throws IOException {
-		this(root, Collections.emptyMap());
+	public ShaderPack(Path root, Iterable<StringPair> environmentDefines) throws IOException, IllegalStateException {
+		this(root, Collections.emptyMap(), environmentDefines);
 	}
 
 	/**
@@ -76,7 +80,7 @@ public class ShaderPack {
 	 *             have completed, and there is no need to hold on to the path for that reason.
 	 * @throws IOException if there are any IO errors during shader pack loading.
 	 */
-	public ShaderPack(Path root, Map<String, String> changedConfigs) throws IOException {
+	public ShaderPack(Path root, Map<String, String> changedConfigs, Iterable<StringPair> environmentDefines) throws IOException, IllegalStateException {
 		// A null path is not allowed.
 		Objects.requireNonNull(root);
 
@@ -113,9 +117,30 @@ public class ShaderPack {
 		this.shaderPackOptions = new ShaderPackOptions(graph, changedConfigs);
 		graph = this.shaderPackOptions.getIncludes();
 
+		Iterable<StringPair> finalEnvironmentDefines = environmentDefines;
 		ShaderProperties shaderProperties = loadProperties(root, "shaders.properties")
-				.map(source -> new ShaderProperties(source, shaderPackOptions))
+				.map(source -> new ShaderProperties(source, shaderPackOptions, finalEnvironmentDefines))
 				.orElseGet(ShaderProperties::empty);
+
+		List<FeatureFlags> invalidFlagList = shaderProperties.getRequiredFeatureFlags().stream().filter(FeatureFlags::isInvalid).map(FeatureFlags::getValue).collect(Collectors.toList());
+		List<String> invalidFeatureFlags = invalidFlagList.stream().map(FeatureFlags::getHumanReadableName).collect(Collectors.toList());
+
+		if (!invalidFeatureFlags.isEmpty()) {
+			if (Minecraft.getInstance().screen instanceof ShaderPackScreen) {
+				Minecraft.getInstance().setScreen(new FeatureMissingErrorScreen(Minecraft.getInstance().screen, new TranslatableComponent("iris.unsupported.pack"), new TranslatableComponent("iris.unsupported.pack.description", FeatureFlags.getInvalidStatus(invalidFlagList), invalidFeatureFlags.stream()
+					.collect(Collectors.joining(", ", ": ", ".")))));
+			}
+			IrisApi.getInstance().getConfig().setShadersEnabledAndApply(false);
+		}
+
+		List<String> optionalFeatureFlags = shaderProperties.getOptionalFeatureFlags().stream().filter(flag -> !FeatureFlags.isInvalid(flag)).collect(Collectors.toList());
+
+		if (!optionalFeatureFlags.isEmpty()) {
+			List<StringPair> newEnvDefines = new ArrayList<>();
+			environmentDefines.forEach(newEnvDefines::add);
+			optionalFeatureFlags.forEach(flag -> newEnvDefines.add(new StringPair("IRIS_FEATURE_" + flag, "")));
+			environmentDefines = ImmutableList.copyOf(newEnvDefines);
+		}
 
 		ProfileSet profiles = ProfileSet.fromTree(shaderProperties.getProfiles(), this.shaderPackOptions.getOptionSet());
 		this.profile = profiles.scan(this.shaderPackOptions.getOptionSet(), this.shaderPackOptions.getOptionValues());
@@ -123,6 +148,14 @@ public class ShaderPack {
 		// Get programs that should be disabled from the detected profile
 		List<String> disabledPrograms = new ArrayList<>();
 		this.profile.current.ifPresent(profile -> disabledPrograms.addAll(profile.disabledPrograms));
+		// Add programs that are disabled by shader options
+		shaderProperties.getConditionallyEnabledPrograms().forEach((program, shaderOption) -> {
+			if ("true".equals(shaderOption)) return;
+
+			if ("false".equals(shaderOption) || !this.shaderPackOptions.getOptionValues().getBooleanValueOrDefault(shaderOption)) {
+				disabledPrograms.add(program);
+			}
+		});
 
 		this.menuContainer = new OptionMenuContainer(shaderProperties, this.shaderPackOptions, profiles);
 
@@ -142,6 +175,7 @@ public class ShaderPack {
 		IncludeProcessor includeProcessor = new IncludeProcessor(graph);
 
 		// Set up our source provider for creating ProgramSets
+		Iterable<StringPair> finalEnvironmentDefines1 = environmentDefines;
 		Function<AbsolutePackPath, String> sourceProvider = (path) -> {
 			String pathString = path.getPathString();
 			// Removes the first "/" in the path if present, and the file
@@ -159,9 +193,6 @@ public class ShaderPack {
 				return null;
 			}
 
-			// Normalize version directives.
-			lines = LineTransform.apply(lines, VersionDirectiveNormalizer.INSTANCE);
-
 			StringBuilder builder = new StringBuilder();
 
 			for (String line : lines) {
@@ -169,13 +200,14 @@ public class ShaderPack {
 				builder.append('\n');
 			}
 
-			// Apply shader environment defines / constants
-			// TODO: Write our own code pathways for this
-			ShaderConstants constants = ProgramBuilder.MACRO_CONSTANTS;
-			String source = GlShader.processShader(builder.toString(), constants);
-
-			// Apply GLSL preprocessor to source
-			source = JcppProcessor.glslPreprocessSource(source);
+			// Apply GLSL preprocessor to source, while making environment defines available.
+			//
+			// This uses similar techniques to the *.properties preprocessor to avoid actually putting
+			// #define statements in the actual source - instead, we tell the preprocessor about them
+			// directly. This removes one obstacle to accurate reporting of line numbers for errors,
+			// though there exist many more (such as relocating all #extension directives and similar things)
+			String source = builder.toString();
+			source = JcppProcessor.glslPreprocessSource(source, finalEnvironmentDefines1);
 
 			return source;
 		};
@@ -189,7 +221,7 @@ public class ShaderPack {
 		this.end = loadOverrides(hasEnd, AbsolutePackPath.fromAbsolutePath("/world1"), sourceProvider,
 				shaderProperties, this);
 
-		this.idMap = new IdMap(root, shaderPackOptions);
+		this.idMap = new IdMap(root, shaderPackOptions, environmentDefines);
 
 		customNoiseTexture = shaderProperties.getNoiseTexturePath().map(path -> {
 			try {
@@ -253,7 +285,11 @@ public class ShaderPack {
 				Iris.logger.warn("Resource location " + path + " contained more than two parts?");
 			}
 
-			customTextureData = new CustomTextureData.ResourceData(parts[0], parts[1]);
+			if (parts[0].equals("minecraft") && (parts[1].equals("dynamic/lightmap_1") || parts[1].equals("dynamic/light_map_1"))) {
+				customTextureData = new CustomTextureData.LightmapMarker();
+			} else {
+				customTextureData = new CustomTextureData.ResourceData(parts[0], parts[1]);
+			}
 		} else {
 			// TODO: Make sure the resulting path is within the shaderpack?
 			if (path.startsWith("/")) {
@@ -267,15 +303,20 @@ public class ShaderPack {
 
 			String mcMetaPath = path + ".mcmeta";
 			Path mcMetaResolvedPath = root.resolve(mcMetaPath);
+
 			if (Files.exists(mcMetaResolvedPath)) {
-				JsonObject meta = loadMcMeta(mcMetaResolvedPath);
-				if (meta.get("texture") != null) {
-					if (meta.get("texture").getAsJsonObject().get("blur") != null) {
-						blur = meta.get("texture").getAsJsonObject().get("blur").getAsBoolean();
+				try {
+					JsonObject meta = loadMcMeta(mcMetaResolvedPath);
+					if (meta.get("texture") != null) {
+						if (meta.get("texture").getAsJsonObject().get("blur") != null) {
+							blur = meta.get("texture").getAsJsonObject().get("blur").getAsBoolean();
+						}
+						if (meta.get("texture").getAsJsonObject().get("clamp") != null) {
+							clamp = meta.get("texture").getAsJsonObject().get("clamp").getAsBoolean();
+						}
 					}
-					if (meta.get("texture").getAsJsonObject().get("clamp") != null) {
-						clamp = meta.get("texture").getAsJsonObject().get("clamp").getAsBoolean();
-					}
+				} catch (IOException e) {
+					Iris.logger.error("Unable to read the custom texture mcmeta at " + mcMetaPath + ", ignoring: " + e);
 				}
 			}
 
@@ -345,7 +386,7 @@ public class ShaderPack {
 		return idMap;
 	}
 
-	public Object2ObjectMap<TextureStage, Object2ObjectMap<String, CustomTextureData>> getCustomTextureDataMap() {
+	public EnumMap<TextureStage, Object2ObjectMap<String, CustomTextureData>> getCustomTextureDataMap() {
 		return customTextureDataMap;
 	}
 

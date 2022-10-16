@@ -2,11 +2,15 @@ package net.coderbot.iris.pipeline;
 
 import com.mojang.blaze3d.platform.GlStateManager;
 import net.coderbot.iris.block_rendering.BlockRenderingSettings;
-import net.coderbot.iris.layer.GbufferProgram;
+import net.coderbot.iris.gbuffer_overrides.matching.InputAvailability;
+import net.coderbot.iris.gbuffer_overrides.matching.SpecialCondition;
+import net.coderbot.iris.gbuffer_overrides.state.RenderTargetStateListener;
 import net.coderbot.iris.mixin.LevelRendererAccessor;
+import net.coderbot.iris.shaderpack.CloudSetting;
 import net.coderbot.iris.uniforms.FrameUpdateNotifier;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
+
 import java.util.List;
 import java.util.OptionalInt;
 
@@ -15,6 +19,8 @@ public class FixedFunctionWorldRenderingPipeline implements WorldRenderingPipeli
 		BlockRenderingSettings.INSTANCE.setDisableDirectionalShading(shouldDisableDirectionalShading());
 		BlockRenderingSettings.INSTANCE.setUseSeparateAo(false);
 		BlockRenderingSettings.INSTANCE.setAmbientOcclusionLevel(1.0f);
+		BlockRenderingSettings.INSTANCE.setUseExtendedVertexFormat(false);
+		BlockRenderingSettings.INSTANCE.setBlockTypeIds(null);
 	}
 
 	@Override
@@ -45,18 +51,58 @@ public class FixedFunctionWorldRenderingPipeline implements WorldRenderingPipeli
 	}
 
 	@Override
+	public void beginSodiumTerrainRendering() {
+
+	}
+
+	@Override
+	public void endSodiumTerrainRendering() {
+
+	}
+
+	@Override
+	public void setOverridePhase(WorldRenderingPhase phase) {
+
+	}
+
+	@Override
 	public void setPhase(WorldRenderingPhase phase) {
 
 	}
 
 	@Override
-	public void beginShadowRender() {
-		// stub: nothing to do here
+	public void setInputs(InputAvailability availability) {
+
 	}
 
 	@Override
-	public void endShadowRender() {
-		// stub: nothing to do here
+	public void setSpecialCondition(SpecialCondition special) {
+
+	}
+
+	@Override
+	public void syncProgram() {
+
+	}
+
+	@Override
+	public RenderTargetStateListener getRenderTargetStateListener() {
+		return RenderTargetStateListener.NOP;
+	}
+
+	@Override
+	public int getCurrentNormalTexture() {
+		return 0;
+	}
+
+	@Override
+	public int getCurrentSpecularTexture() {
+		return 0;
+	}
+
+	@Override
+	public void onBindTexture(int id) {
+
 	}
 
 	@Override
@@ -66,16 +112,6 @@ public class FixedFunctionWorldRenderingPipeline implements WorldRenderingPipeli
 
 	@Override
 	public void beginTranslucents() {
-		// stub: nothing to do here
-	}
-
-	@Override
-	public void pushProgram(GbufferProgram program) {
-		// stub: nothing to do here
-	}
-
-	@Override
-	public void popProgram(GbufferProgram program) {
 		// stub: nothing to do here
 	}
 
@@ -112,9 +148,8 @@ public class FixedFunctionWorldRenderingPipeline implements WorldRenderingPipeli
 	}
 
 	@Override
-	public boolean shouldRenderClouds() {
-		// Keep clouds enabled
-		return true;
+	public CloudSetting getCloudSetting() {
+		return CloudSetting.DEFAULT;
 	}
 
 	@Override
@@ -128,12 +163,27 @@ public class FixedFunctionWorldRenderingPipeline implements WorldRenderingPipeli
 	}
 
 	@Override
+	public boolean shouldRenderSun() {
+		return true;
+	}
+
+	@Override
+	public boolean shouldRenderMoon() {
+		return true;
+	}
+
+	@Override
 	public boolean shouldWriteRainAndSnowToDepthBuffer() {
 		return false;
 	}
 
 	@Override
 	public boolean shouldRenderParticlesBeforeDeferred() {
+		return false;
+	}
+
+	@Override
+	public boolean allowConcurrentCompute() {
 		return false;
 	}
 

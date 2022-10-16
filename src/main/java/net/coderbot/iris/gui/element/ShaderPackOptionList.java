@@ -22,22 +22,14 @@ import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.util.Mth;
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.PointerBuffer;
-import org.lwjgl.glfw.GLFW;
-import org.lwjgl.system.MemoryStack;
-import org.lwjgl.system.MemoryUtil;
-import org.lwjgl.util.tinyfd.TinyFileDialogs;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.Properties;
 
 public class ShaderPackOptionList extends IrisObjectSelectionList<ShaderPackOptionList.BaseEntry> {
@@ -244,6 +236,15 @@ public class ShaderPackOptionList extends IrisObjectSelectionList<ShaderPackOpti
 				return false;
 			}
 
+			// Displaying a dialog when the game is full-screened can cause severe issues
+			// https://github.com/IrisShaders/Iris/issues/1258
+			if (Minecraft.getInstance().getWindow().isFullscreen()) {
+				this.screen.displayNotification(
+					new TranslatableComponent("options.iris.mustDisableFullscreen")
+						.withStyle(ChatFormatting.RED).withStyle(ChatFormatting.BOLD));
+				return false;
+			}
+
 			final ShaderPackScreen originalScreen = this.screen; // Also used to prevent invalid state
 
 			FileDialogUtil.fileSelectDialog(
@@ -270,6 +271,15 @@ public class ShaderPackOptionList extends IrisObjectSelectionList<ShaderPackOpti
 
 			// Invalid state to be in
 			if (!Iris.getCurrentPack().isPresent()) {
+				return false;
+			}
+
+			// Displaying a dialog when the game is full-screened can cause severe issues
+			// https://github.com/IrisShaders/Iris/issues/1258
+			if (Minecraft.getInstance().getWindow().isFullscreen()) {
+				this.screen.displayNotification(
+					new TranslatableComponent("options.iris.mustDisableFullscreen")
+						.withStyle(ChatFormatting.RED).withStyle(ChatFormatting.BOLD));
 				return false;
 			}
 
