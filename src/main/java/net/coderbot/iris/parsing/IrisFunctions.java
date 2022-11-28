@@ -4,6 +4,7 @@ import kroppeb.stareval.expression.Expression;
 import kroppeb.stareval.function.*;
 import kroppeb.stareval.function.TypedFunction.Parameter;
 import net.coderbot.iris.vendored.joml.*;
+import net.minecraft.util.Mth;
 
 import java.lang.Math;
 import java.util.Arrays;
@@ -659,6 +660,32 @@ public class IrisFunctions {
 									fadeUpTime,
 									fadeDownTime
 								);
+							}
+						});
+
+					// lerp(k, x, y)
+					builder.addDynamicFunction("lerp", Type.Float, () ->
+						new AbstractTypedFunction(
+							Type.Float,
+							new Parameter[]{
+								new Parameter(Type.Float, false), // amount
+								new Parameter(Type.Float, false), // start
+								new Parameter(Type.Float, false), // end
+							},
+							0,
+							false
+						) {
+							@Override
+							public void evaluateTo(Expression[] params, FunctionContext context, FunctionReturn functionReturn) {
+								params[0].evaluateTo(context, functionReturn);
+								float amount = functionReturn.floatReturn;
+
+								params[1].evaluateTo(context, functionReturn);
+								float start = functionReturn.floatReturn;
+								params[2].evaluateTo(context, functionReturn);
+								float end = functionReturn.floatReturn;
+
+								functionReturn.floatReturn = start + amount * (end - start);
 							}
 						});
 				}
