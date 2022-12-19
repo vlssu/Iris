@@ -391,7 +391,7 @@ public class ShadowRenderer {
 		// chunks during traversal, and break rendering in concerning ways.
 		SodiumWorldRenderer.instance().incrementFrame();
 
-		client.smartCull = wasChunkCullingEnabled;
+		client.smartCull = false;
 
 		levelRenderer.getLevel().getProfiler().popPush("terrain");
 

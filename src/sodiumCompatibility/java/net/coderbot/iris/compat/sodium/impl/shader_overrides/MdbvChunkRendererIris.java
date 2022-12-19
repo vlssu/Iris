@@ -28,6 +28,7 @@ import net.caffeinemc.sodium.render.terrain.format.TerrainVertexType;
 import net.caffeinemc.sodium.render.terrain.quad.properties.ChunkMeshFace;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
+import org.lwjgl.opengl.GL43C;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.system.Pointer;
 
@@ -44,12 +45,14 @@ public class MdbvChunkRendererIris extends AbstractIrisMdChunkRenderer<MdbvChunk
 		RenderDevice device,
 		ChunkCameraContext camera,
 		ChunkRenderPassManager renderPassManager,
-		TerrainVertexType vertexType
+		TerrainVertexType vertexType,
+		boolean isShadowPass
 	) {
-		super(overrides, device, camera, renderPassManager, vertexType);
+		super(overrides, device, camera, renderPassManager, vertexType, isShadowPass);
 
 		this.sectionFacesAllocated = 1024; // can be resized when needed, just a guess
 		this.allocateCPUBuffers();
+		GL43C.glFinish();
 	}
 
 	protected void allocateCPUBuffers() {
@@ -81,6 +84,7 @@ public class MdbvChunkRendererIris extends AbstractIrisMdChunkRenderer<MdbvChunk
 			this.renderLists = null;
 			return;
 		}
+		GL43C.glFinish();
 
 		BlockPos cameraBlockPos = this.camera.getBlockPos();
 		float cameraDeltaX = this.camera.getDeltaX();
@@ -99,6 +103,7 @@ public class MdbvChunkRendererIris extends AbstractIrisMdChunkRenderer<MdbvChunk
 		);
 		ByteBuffer transformsBufferSectionView = transformsBufferSection.getView();
 		long transformsBufferSectionAddress = MemoryUtil.memAddress0(transformsBufferSectionView);
+		GL43C.glFinish();
 
 		int maxSectionFaces = getMaxSectionFaces(lists);
 
@@ -115,6 +120,7 @@ public class MdbvChunkRendererIris extends AbstractIrisMdChunkRenderer<MdbvChunk
 
 		@SuppressWarnings("unchecked")
 		Collection<MdbvChunkRenderBatch>[] renderLists = new Collection[totalPasses];
+		GL43C.glFinish();
 
 		for (int passId = 0; passId < chunkRenderPasses.length; passId++) {
 			ChunkRenderPass renderPass = chunkRenderPasses[passId];
@@ -123,6 +129,7 @@ public class MdbvChunkRendererIris extends AbstractIrisMdChunkRenderer<MdbvChunk
 			var pass = lists.builtPasses[passId];
 			IntList passRegionIndices = pass.regionIndices;
 			int passRegionCount = passRegionIndices.size();
+			GL43C.glFinish();
 
 			boolean reverseOrder = renderPass.isTranslucent();
 
@@ -137,6 +144,7 @@ public class MdbvChunkRendererIris extends AbstractIrisMdChunkRenderer<MdbvChunk
 				RenderRegion region = lists.regions.get(fullRegionIdx);
 				IntList regionSectionCoords = lists.sectionCoords.get(fullRegionIdx);
 				LongList regionUploadedSegments = lists.uploadedSegments.get(fullRegionIdx);
+				GL43C.glFinish();
 
 				int regionPassSectionCount = regionPassSectionIndices.size();
 
@@ -146,6 +154,7 @@ public class MdbvChunkRendererIris extends AbstractIrisMdChunkRenderer<MdbvChunk
 				} else {
 					regionIdx++;
 				}
+				GL43C.glFinish();
 
 				int regionPassModelPartIdx = reverseOrder ? regionPassModelPartSegments.size() - 1 : 0;
 				int regionPassModelPartCount = 0;
@@ -166,6 +175,7 @@ public class MdbvChunkRendererIris extends AbstractIrisMdChunkRenderer<MdbvChunk
 					} else {
 						sectionIdx++;
 					}
+					GL43C.glFinish();
 
 					// this works because the segment is in units of vertices
 					int baseVertex = BufferSegment.getOffset(sectionUploadedSegment);

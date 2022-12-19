@@ -30,7 +30,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyArg;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(TerrainRenderManager.class)
@@ -39,6 +39,9 @@ public class MixinRenderSectionManager {
 	@Shadow
 	@Final
 	private ChunkRenderer chunkRenderer;
+
+	@Unique
+	private ChunkRenderer chunkRendererShadow;
 
 	@Unique
 	private IrisChunkProgramOverrides irisChunkProgramOverrides;
@@ -58,9 +61,25 @@ public class MixinRenderSectionManager {
 
 		this.irisChunkProgramOverrides = new IrisChunkProgramOverrides();
 
-		this.chunkRenderer = irisChunkRendererCreation(device, camera, createVertexType(), renderPassManager);
+		this.chunkRenderer = irisChunkRendererCreation(device, camera, createVertexType(), renderPassManager, false);
+		this.chunkRendererShadow = irisChunkRendererCreation(device, camera, createVertexType(), renderPassManager, true);
 
 		this.manager = renderPassManager;
+	}
+
+	@Redirect(method = "update", at = @At(value = "FIELD", target = "Lnet/caffeinemc/sodium/render/chunk/TerrainRenderManager;chunkRenderer:Lnet/caffeinemc/sodium/render/chunk/draw/ChunkRenderer;"))
+	private ChunkRenderer iris$changeChunkRenderer(TerrainRenderManager instance) {
+		return ShadowRenderingState.areShadowsCurrentlyBeingRendered() ? chunkRendererShadow : chunkRenderer;
+	}
+
+	@Redirect(method = "renderLayer", at = @At(value = "FIELD", target = "Lnet/caffeinemc/sodium/render/chunk/TerrainRenderManager;chunkRenderer:Lnet/caffeinemc/sodium/render/chunk/draw/ChunkRenderer;"))
+	private ChunkRenderer iris$changeChunkRenderer2(TerrainRenderManager instance) {
+		return ShadowRenderingState.areShadowsCurrentlyBeingRendered() ? chunkRendererShadow : chunkRenderer;
+	}
+
+	@Inject(method = "destroy", at = @At("HEAD"))
+	private void deleteShadowPipeline(CallbackInfo ci) {
+		chunkRendererShadow.delete();
 	}
 
 	@Inject(method = "renderLayer", at = @At("HEAD"), remap = false)
@@ -73,12 +92,16 @@ public class MixinRenderSectionManager {
 				irisChunkRenderer.deletePipeline();
 				irisChunkRenderer.createPipelines(irisChunkProgramOverrides);
 			}
+
+			if (chunkRendererShadow instanceof IrisChunkRenderer irisChunkRenderer) {
+				irisChunkRenderer.deletePipeline();
+				irisChunkRenderer.createPipelines(irisChunkProgramOverrides);
+			}
 		}
 	}
 
 	@Inject(method = "destroy", at = @At("TAIL"), remap = false)
 	private void destroyShadow(CallbackInfo ci) {
-		irisChunkProgramOverrides.deleteShaders(device);
 	}
 
 	/**
@@ -89,16 +112,16 @@ public class MixinRenderSectionManager {
 		return null;
 	}
 
-	private ChunkRenderer irisChunkRendererCreation(RenderDevice device, ChunkCameraContext camera, TerrainVertexType vertexType, ChunkRenderPassManager renderPassManager) {
+	private ChunkRenderer irisChunkRendererCreation(RenderDevice device, ChunkCameraContext camera, TerrainVertexType vertexType, ChunkRenderPassManager renderPassManager, boolean isShadowPass) {
 		if (IrisApi.getInstance().isShaderPackInUse()) {
 			try {
 				switch (SodiumClientMod.options().advanced.chunkRendererBackend) {
 					case DEFAULT:
-						return device.properties().preferences.directRendering ? new MdbvChunkRendererIris(irisChunkProgramOverrides, device, camera, renderPassManager, vertexType) : new MdiChunkRendererIris(irisChunkProgramOverrides, device, camera, renderPassManager, vertexType);
+						return device.properties().preferences.directRendering ? new MdbvChunkRendererIris(irisChunkProgramOverrides, device, camera, renderPassManager, vertexType, isShadowPass) : new MdiChunkRendererIris(irisChunkProgramOverrides, device, camera, renderPassManager, vertexType, isShadowPass);
 					case BASEVERTEX:
-						return new MdbvChunkRendererIris(irisChunkProgramOverrides, device, camera, renderPassManager, vertexType);
+						return new MdbvChunkRendererIris(irisChunkProgramOverrides, device, camera, renderPassManager, vertexType, isShadowPass);
 					case INDIRECT:
-						return new MdiChunkRendererIris(irisChunkProgramOverrides, device, camera, renderPassManager, vertexType);
+						return new MdiChunkRendererIris(irisChunkProgramOverrides, device, camera, renderPassManager, vertexType, isShadowPass);
 					default:
 						throw new IncompatibleClassChangeError();
 				}

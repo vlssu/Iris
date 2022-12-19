@@ -2,6 +2,7 @@ package net.coderbot.iris.compat.sodium.impl.shader_overrides;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
@@ -57,7 +58,6 @@ public abstract class AbstractIrisMdChunkRenderer<B extends AbstractIrisMdChunkR
 
     protected final ChunkRenderPassManager renderPassManager;
     protected final RenderPipeline<IrisChunkShaderInterface, BufferTarget>[] pipelines;
-    protected final RenderPipeline<IrisChunkShaderInterface, BufferTarget>[] shadowPipelines;
 
     protected final StreamingBuffer uniformBufferCameraMatrices;
     protected final StreamingBuffer uniformBufferChunkTransforms;
@@ -68,23 +68,25 @@ public abstract class AbstractIrisMdChunkRenderer<B extends AbstractIrisMdChunkR
 	protected Collection<B>[] renderLists;
 	protected IrisChunkProgramOverrides overrides;
 	private TerrainVertexType vertexType;
+	private boolean isShadowPass;
 
     public AbstractIrisMdChunkRenderer(
 			IrisChunkProgramOverrides overrides,
             RenderDevice device,
 			ChunkCameraContext camera,
             ChunkRenderPassManager renderPassManager,
-            TerrainVertexType vertexType
+            TerrainVertexType vertexType,
+			boolean isShadowPass
     ) {
         super(device, camera);
 
+		this.isShadowPass = isShadowPass;
         this.renderPassManager = renderPassManager;
 		this.overrides = overrides;
 
 		this.vertexType = vertexType;
         //noinspection unchecked
 		this.pipelines = new RenderPipeline[renderPassManager.getRenderPassCount()];
-		this.shadowPipelines = new RenderPipeline[renderPassManager.getRenderPassCount()];
 
 		// construct all pipelines for current render passes now
 		var vertexFormat = vertexType.getCustomVertexFormat();
@@ -111,25 +113,11 @@ public abstract class AbstractIrisMdChunkRenderer<B extends AbstractIrisMdChunkR
 			})
 		));
 
-		boolean hasShadowPass = overrides.getSodiumTerrainPipeline() != null && overrides.getSodiumTerrainPipeline().hasShadowPass();
-
 		RenderPipelineDescription terrainDescription = RenderPipelineDescription.builder().setCullingMode(CullMode.DISABLE).build();
 		RenderPipelineDescription translucentDescription = RenderPipelineDescription.builder().setCullingMode(CullMode.DISABLE).setBlendFunction(BlendFunc.separate(BlendFunc.SrcFactor.SRC_ALPHA, BlendFunc.DstFactor.ONE_MINUS_SRC_ALPHA, BlendFunc.SrcFactor.ONE, BlendFunc.DstFactor.ONE_MINUS_SRC_ALPHA)).build();
 
 		for (ChunkRenderPass pass : renderPassManager.getAllRenderPasses()) {
-			Program<IrisChunkShaderInterface> program = overrides.getProgramOverride(this instanceof MdiChunkRendererIris, getMaxBatchSize(), false, device, pass, vertexType);
-			if (program == null) {
-				throw new RuntimeException("failure");
-			}
-			RenderPipeline<IrisChunkShaderInterface, BufferTarget> pipeline = this.device.createRenderPipeline(
-				pass.getPipelineDescription(),
-				program,
-				vertexArray
-			);
-
-			this.pipelines[pass.getId()] = pipeline;
-
-			if (hasShadowPass) {
+			if (isShadowPass) {
 				Program<IrisChunkShaderInterface> shadowProgram = overrides.getProgramOverride(this instanceof MdiChunkRendererIris, getMaxBatchSize(), true, device, pass, vertexType);
 				if (shadowProgram == null) {
 					throw new RuntimeException("failure");
@@ -140,7 +128,19 @@ public abstract class AbstractIrisMdChunkRenderer<B extends AbstractIrisMdChunkR
 					vertexArray
 				);
 
-				this.shadowPipelines[pass.getId()] = shadowPipeline;
+				this.pipelines[pass.getId()] = shadowPipeline;
+			} else {
+				Program<IrisChunkShaderInterface> program = overrides.getProgramOverride(this instanceof MdiChunkRendererIris, getMaxBatchSize(), false, device, pass, vertexType);
+				if (program == null) {
+					throw new RuntimeException("failure");
+				}
+				RenderPipeline<IrisChunkShaderInterface, BufferTarget> pipeline = this.device.createRenderPipeline(
+					pass.getPipelineDescription(),
+					program,
+					vertexArray
+				);
+
+				this.pipelines[pass.getId()] = pipeline;
 			}
 		}
 
@@ -152,7 +152,7 @@ public abstract class AbstractIrisMdChunkRenderer<B extends AbstractIrisMdChunkR
         this.uniformBufferCameraMatrices = new DualStreamingBuffer(
                 device,
                 uboAlignment,
-                MathUtil.align(CAMERA_MATRICES_SIZE, uboAlignment) * totalPasses * 2,
+                MathUtil.align(CAMERA_MATRICES_SIZE, uboAlignment) * totalPasses,
                 maxInFlightFrames,
                 EnumSet.of(MappedBufferFlags.EXPLICIT_FLUSH)
         );
@@ -166,7 +166,7 @@ public abstract class AbstractIrisMdChunkRenderer<B extends AbstractIrisMdChunkR
         this.uniformBufferFogParameters = new DualStreamingBuffer(
                 device,
                 uboAlignment,
-                MathUtil.align(FOG_PARAMETERS_SIZE, uboAlignment) * totalPasses * 2,
+                MathUtil.align(FOG_PARAMETERS_SIZE, uboAlignment) * totalPasses,
                 maxInFlightFrames,
                 EnumSet.of(MappedBufferFlags.EXPLICIT_FLUSH)
         );
@@ -193,6 +193,10 @@ public abstract class AbstractIrisMdChunkRenderer<B extends AbstractIrisMdChunkR
 
 	@Override
 	public void deletePipeline() {
+		for (RenderPipeline<?, ?> pipeline : this.pipelines) {
+			this.device.deleteRenderPipeline(pipeline);
+		}
+		Arrays.fill(pipelines, null);
 		overrides.deleteShaders(device);
 	}
 
@@ -203,22 +207,22 @@ public abstract class AbstractIrisMdChunkRenderer<B extends AbstractIrisMdChunkR
 		RenderPipelineDescription translucentDescription = RenderPipelineDescription.builder().setCullingMode(CullMode.DISABLE).setBlendFunction(BlendFunc.separate(BlendFunc.SrcFactor.SRC_ALPHA, BlendFunc.DstFactor.ONE_MINUS_SRC_ALPHA, BlendFunc.SrcFactor.ONE, BlendFunc.DstFactor.ONE_MINUS_SRC_ALPHA)).build();
 
 		for (ChunkRenderPass pass : renderPassManager.getAllRenderPasses()) {
-			RenderPipeline<IrisChunkShaderInterface, BufferTarget> pipeline = this.device.createRenderPipeline(
-				pass.getPipelineDescription(),
-				overrides.getProgramOverride(this instanceof MdiChunkRendererIris, getMaxBatchSize(), false, device, pass, vertexType),
-				vertexArray
-			);
-
-			this.pipelines[pass.getId()] = pipeline;
-
-			if (hasShadowPass) {
+			if (isShadowPass) {
 				RenderPipeline<IrisChunkShaderInterface, BufferTarget> shadowPipeline = this.device.createRenderPipeline(
 					pass.isTranslucent() ? translucentDescription : terrainDescription,
 					overrides.getProgramOverride(this instanceof MdiChunkRendererIris, getMaxBatchSize(), true, device, pass, vertexType),
 					vertexArray
 				);
 
-				this.shadowPipelines[pass.getId()] = shadowPipeline;
+				this.pipelines[pass.getId()] = shadowPipeline;
+			} else {
+				RenderPipeline<IrisChunkShaderInterface, BufferTarget> pipeline = this.device.createRenderPipeline(
+					pass.getPipelineDescription(),
+					overrides.getProgramOverride(this instanceof MdiChunkRendererIris, getMaxBatchSize(), false, device, pass, vertexType),
+					vertexArray
+				);
+
+				this.pipelines[pass.getId()] = pipeline;
 			}
 		}
 	}
@@ -244,23 +248,23 @@ public abstract class AbstractIrisMdChunkRenderer<B extends AbstractIrisMdChunkR
 
         // if the render list exists, the pipeline probably exists (unless a new render pass was added without a reload)
 		RenderPipeline<IrisChunkShaderInterface, BufferTarget> pipeline;
-		if(ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
-			pipeline = this.shadowPipelines[passId];
-		} else {
-			pipeline = this.pipelines[passId];
-		}
+		pipeline = this.pipelines[passId];
 
 		RenderSystem.setShaderTexture(0, GlTexture.getHandle(TextureUtil.getBlockAtlasTexture()));
 		pipeline.getProgram().getInterface().setup();
-        this.device.useRenderPipeline(pipeline, (commandList, programInterface, pipelineState) -> {
-            this.setupPerRenderList(renderPass, matrices, frameIndex, pipeline, commandList, programInterface, pipelineState);
+		if (overrides.isShadersCreated()) {
+			this.device.useRenderPipeline(pipeline, (commandList, programInterface, pipelineState) -> {
+				this.setupPerRenderList(renderPass, matrices, frameIndex, pipeline, commandList, programInterface, pipelineState);
 
-            for (B batch : renderList) {
-                this.setupPerBatch(renderPass, matrices, frameIndex, pipeline, commandList, programInterface, pipelineState, batch);
+				for (B batch : renderList) {
+					this.setupPerBatch(renderPass, matrices, frameIndex, pipeline, commandList, programInterface, pipelineState, batch);
 
-                this.issueDraw(renderPass, matrices, frameIndex, pipeline, commandList, programInterface, pipelineState, batch);
-            }
-        });
+					this.issueDraw(renderPass, matrices, frameIndex, pipeline, commandList, programInterface, pipelineState, batch);
+				}
+			});
+		} else {
+			throw new RuntimeException("WTF?");
+		}
 		pipeline.getProgram().getInterface().restore();
 	}
 

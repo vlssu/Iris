@@ -11,6 +11,7 @@ import net.caffeinemc.sodium.render.chunk.SectionTree;
 import net.caffeinemc.sodium.render.chunk.SortedSectionLists;
 import net.caffeinemc.sodium.render.chunk.TerrainRenderManager;
 import net.caffeinemc.sodium.render.chunk.compile.ChunkBuilder;
+import net.caffeinemc.sodium.render.chunk.compile.tasks.TerrainBuildResult;
 import net.caffeinemc.sodium.render.chunk.cull.SectionCuller;
 import net.caffeinemc.sodium.render.chunk.draw.ChunkCameraContext;
 import net.caffeinemc.sodium.render.chunk.draw.SortedTerrainLists;
@@ -30,11 +31,14 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -101,7 +105,7 @@ public abstract class MixinTerrainRenderManager implements SwappableRenderSectio
 	private boolean needsUpdateSwap;
 
     @Unique
-    private static final ObjectArrayFIFOQueue<?> EMPTY_QUEUE = new ObjectArrayFIFOQueue<>();
+    private static final LinkedList<CompletableFuture<TerrainBuildResult>> EMPTY_QUEUE = new LinkedList<>();
 
     @Inject(method = "<init>", at = @At("RETURN"))
     private void iris$onInit(RenderDevice device, SodiumWorldRenderer worldRenderer, ChunkRenderPassManager renderPassManager, ClientLevel world, ChunkCameraContext camera, int chunkViewDistance, CallbackInfo ci) {
@@ -142,6 +146,13 @@ public abstract class MixinTerrainRenderManager implements SwappableRenderSectio
 			ShadowRenderer.visibleBlockEntities = StreamSupport
 				.stream(this.blockEntityRenderManager.getSectionedBlockEntities().spliterator(), false)
 				.collect(Collectors.toList());;
+		}
+	}
+
+	@Inject(method = "submitBuildTasks", at = @At("HEAD"), cancellable = true)
+	private void iris$cancelBuildTasks(CallbackInfoReturnable<LinkedList<CompletableFuture<TerrainBuildResult>>> cir) {
+		if (ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+			cir.setReturnValue(EMPTY_QUEUE);
 		}
 	}
 

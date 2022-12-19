@@ -44,9 +44,10 @@ public class MdiChunkRendererIris extends AbstractIrisMdChunkRenderer<MdiChunkRe
 		RenderDevice device,
 		ChunkCameraContext camera,
 		ChunkRenderPassManager renderPassManager,
-		TerrainVertexType vertexType
+		TerrainVertexType vertexType,
+		boolean isShadowPass
 	) {
-		super(overrides, device, camera, renderPassManager, vertexType);
+		super(overrides, device, camera, renderPassManager, vertexType, isShadowPass);
 
 		int maxInFlightFrames = SodiumClientMod.options().advanced.cpuRenderAheadLimit + 1;
 
