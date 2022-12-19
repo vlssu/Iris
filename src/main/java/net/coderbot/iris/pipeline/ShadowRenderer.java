@@ -3,6 +3,7 @@ package net.coderbot.iris.pipeline;
 import com.google.common.collect.ImmutableList;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
+import net.caffeinemc.sodium.render.SodiumWorldRenderer;
 import net.coderbot.batchedentityrendering.impl.BatchingDebugMessageHelper;
 import net.coderbot.batchedentityrendering.impl.DrawCallTrackingRenderBuffers;
 import net.coderbot.batchedentityrendering.impl.MemoryTrackingRenderBuffers;
@@ -250,6 +251,9 @@ public class ShadowRenderer {
 	}
 
 	private FrustumHolder createShadowFrustum(float renderMultiplier, FrustumHolder holder) {
+		if (true) {
+			return holder.setInfo(new NonCullingFrustum(), "", "");
+		}
 		// TODO: Cull entities / block entities with Advanced Frustum Culling even if voxelization is detected.
 		String distanceInfo;
 		String cullingInfo;
@@ -385,7 +389,7 @@ public class ShadowRenderer {
 		// Don't forget to increment the frame counter! This variable is arbitrary and only used in terrain setup,
 		// and if it's not incremented, the vanilla culling code will get confused and think that it's already seen
 		// chunks during traversal, and break rendering in concerning ways.
-		//worldRenderer.setFrameId(worldRenderer.getFrameId() + 1);
+		SodiumWorldRenderer.instance().incrementFrame();
 
 		client.smartCull = wasChunkCullingEnabled;
 

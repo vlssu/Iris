@@ -5,19 +5,22 @@ import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
 import net.caffeinemc.gfx.api.device.RenderDevice;
 import net.caffeinemc.sodium.interop.vanilla.math.frustum.Frustum;
 import net.caffeinemc.sodium.render.SodiumWorldRenderer;
+import net.caffeinemc.sodium.render.chunk.BlockEntityRenderManager;
 import net.caffeinemc.sodium.render.chunk.RenderSection;
+import net.caffeinemc.sodium.render.chunk.SectionTree;
+import net.caffeinemc.sodium.render.chunk.SortedSectionLists;
 import net.caffeinemc.sodium.render.chunk.TerrainRenderManager;
 import net.caffeinemc.sodium.render.chunk.compile.ChunkBuilder;
+import net.caffeinemc.sodium.render.chunk.cull.SectionCuller;
 import net.caffeinemc.sodium.render.chunk.draw.ChunkCameraContext;
+import net.caffeinemc.sodium.render.chunk.draw.SortedTerrainLists;
 import net.caffeinemc.sodium.render.chunk.passes.ChunkRenderPassManager;
 import net.caffeinemc.sodium.render.chunk.region.RenderRegionManager;
-import net.caffeinemc.sodium.render.chunk.state.ChunkRenderData;
 import net.caffeinemc.sodium.render.terrain.format.TerrainVertexType;
 import net.coderbot.iris.pipeline.ShadowRenderer;
 import net.coderbot.iris.shadows.ShadowRenderingState;
 import net.coderbot.iris.compat.sodium.impl.shadow_map.SwappableRenderSectionManager;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Mutable;
@@ -46,23 +49,6 @@ public abstract class MixinTerrainRenderManager implements SwappableRenderSectio
 	@Shadow(remap = false)
 	private boolean needsUpdate;
 
-	@Shadow
-	@Final
-	@Mutable
-	private List<RenderSection> visibleMeshedSections;
-	@Shadow
-	@Final
-	@Mutable
-
-	private List<RenderSection> visibleTickingSections;
-	@Mutable
-	@Shadow
-	@Final
-	private List<RenderSection> visibleBlockEntitySections;
-
-	@Shadow
-	public abstract Iterable<BlockEntity> getVisibleBlockEntities();
-
 	@Mutable
 	@Shadow
 	@Final
@@ -79,14 +65,36 @@ public abstract class MixinTerrainRenderManager implements SwappableRenderSectio
 
 	@Shadow
 	private int frameIndex;
+	@Mutable
+	@Shadow
+	@Final
+	private SortedTerrainLists sortedTerrainLists;
+	@Mutable
+	@Shadow
+	@Final
+	private SortedSectionLists sortedSectionLists;
+	@Mutable
+	@Shadow
+	@Final
+	private BlockEntityRenderManager blockEntityRenderManager;
+
+	@Mutable
+	@Shadow
+	@Final
+	private SectionCuller sectionCuller;
+	@Shadow
+	@Final
+	private SectionTree sectionTree;
 	@Unique
-    private List<RenderSection> visibleSectionsSwap;
+    private SortedSectionLists sortedSectionListsSwap;
 
     @Unique
-    private List<RenderSection> tickableChunksSwap;
+    private SortedTerrainLists sortedTerrainListsSwap;
 
     @Unique
-    private List<RenderSection> visibleBlockEntitiesSwap;
+    private BlockEntityRenderManager blockEntityRenderManagerSwap;
+	@Unique
+    private SectionCuller sectionCullerSwap;
 
 
     @Unique
@@ -97,25 +105,31 @@ public abstract class MixinTerrainRenderManager implements SwappableRenderSectio
 
     @Inject(method = "<init>", at = @At("RETURN"))
     private void iris$onInit(RenderDevice device, SodiumWorldRenderer worldRenderer, ChunkRenderPassManager renderPassManager, ClientLevel world, ChunkCameraContext camera, int chunkViewDistance, CallbackInfo ci) {
-        this.visibleSectionsSwap = new ReferenceArrayList<>();
-        this.tickableChunksSwap = new ReferenceArrayList<>();
-        this.visibleBlockEntitiesSwap = new ReferenceArrayList<>();
-        this.needsUpdateSwap = true;
-    }
+        this.sortedSectionListsSwap = new SortedSectionLists(this.sectionTree);
+		this.sortedTerrainListsSwap = new SortedTerrainLists(this.regionManager, renderPassManager, this.sortedSectionListsSwap, camera);
+		this.blockEntityRenderManagerSwap = new BlockEntityRenderManager(this.sectionTree, this.sortedSectionListsSwap);
+		this.needsUpdateSwap = true;
+		this.sectionCullerSwap = new SectionCuller(this.sectionTree, this.sortedSectionListsSwap, chunkViewDistance);
+
+	}
 
     @Override
     public void iris$swapVisibilityState() {
-		List<RenderSection> visibleSectionsTmp = visibleMeshedSections;
-		visibleMeshedSections = visibleSectionsSwap;
-        visibleSectionsSwap = visibleSectionsTmp;
+		SortedSectionLists sortedSectionListsTmp = sortedSectionLists;
+		sortedSectionLists = this.sortedSectionListsSwap;
+        this.sortedSectionListsSwap = sortedSectionListsTmp;
 
-        List<RenderSection> tickableChunksTmp = visibleTickingSections;
-        visibleTickingSections = tickableChunksSwap;
-        tickableChunksSwap = tickableChunksTmp;
+		SortedTerrainLists sortedTerrainListsTmp = sortedTerrainLists;
+		sortedTerrainLists = this.sortedTerrainListsSwap;
+		this.sortedTerrainListsSwap = sortedTerrainListsTmp;
 
-		List<RenderSection> visibleBlockEntitiesTmp = visibleBlockEntitySections;
-        visibleBlockEntitySections = visibleBlockEntitiesSwap;
-        visibleBlockEntitiesSwap = visibleBlockEntitiesTmp;
+		BlockEntityRenderManager blockEntityRenderManagerTmp = blockEntityRenderManager;
+		blockEntityRenderManager = this.blockEntityRenderManagerSwap;
+		this.blockEntityRenderManagerSwap = blockEntityRenderManagerTmp;
+
+		SectionCuller sectionCullerTmp = sectionCuller;
+		sectionCuller = this.sectionCullerSwap;
+		this.sectionCullerSwap = sectionCullerTmp;
 
         boolean needsUpdateTmp = needsUpdate;
         needsUpdate = needsUpdateSwap;
@@ -126,15 +140,8 @@ public abstract class MixinTerrainRenderManager implements SwappableRenderSectio
 	private void iris$captureVisibleBlockEntities(Frustum frustum, boolean spectator, CallbackInfo ci) {
 		if (ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
 			ShadowRenderer.visibleBlockEntities = StreamSupport
-				.stream(this.getVisibleBlockEntities().spliterator(), false)
+				.stream(this.blockEntityRenderManager.getSectionedBlockEntities().spliterator(), false)
 				.collect(Collectors.toList());;
-		}
-	}
-
-	@Inject(method = "schedulePendingUpdates", at = @At("HEAD"), cancellable = true, remap = false)
-	private void iris$noRebuildEnqueueingInShadowPass(RenderSection section, CallbackInfo ci) {
-		if (ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
-			ci.cancel();
 		}
 	}
 

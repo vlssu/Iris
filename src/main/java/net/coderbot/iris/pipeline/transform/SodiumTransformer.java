@@ -68,18 +68,9 @@ public class SodiumTransformer {
 		root.replaceReferenceExpressions(t, "gl_NormalMatrix",
 				"mat3(transpose(inverse(mat_modelview)))");
 
-		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-				"uniform mat4 iris_ModelViewMatrixInverse;");
-
-		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-				"uniform mat4 iris_ProjectionMatrixInverse;");
-
 		// TODO: All of the transformed variants of the input matrices, preferably
 		// computed on the CPU side...
-		root.rename("gl_ModelViewMatrix", "iris_ModelViewMatrix");
-		root.rename("gl_ModelViewMatrixInverse", "iris_ModelViewMatrixInverse");
-		root.rename("gl_ProjectionMatrixInverse", "iris_ProjectionMatrixInverse");
-
+		root.rename("gl_ModelViewMatrix", "mat_modelview");
 		if (parameters.type.glShaderType == ShaderType.VERTEX) {
 			// TODO: Vaporwave-Shaderpack expects that vertex positions will be aligned to
 			// chunks.

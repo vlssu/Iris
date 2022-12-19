@@ -5,7 +5,7 @@ import net.caffeinemc.sodium.interop.vanilla.vertex.formats.quad.QuadVertexSink;
 import net.caffeinemc.sodium.render.vertex.buffer.VertexBufferView;
 import net.caffeinemc.sodium.render.vertex.buffer.VertexBufferWriterNio;
 import net.caffeinemc.sodium.util.packed.Normal3b;
-import net.coderbot.iris.vendored.joml.Vector3f;
+import org.joml.Vector3f;
 import net.coderbot.iris.vertices.IrisVertexFormats;
 import net.coderbot.iris.vertices.NormalHelper;
 import net.minecraft.client.renderer.texture.OverlayTexture;

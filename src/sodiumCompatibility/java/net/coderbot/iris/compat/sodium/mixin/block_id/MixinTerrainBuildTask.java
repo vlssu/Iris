@@ -4,7 +4,7 @@ import net.caffeinemc.sodium.render.chunk.compile.tasks.TerrainBuildBuffers;
 import net.caffeinemc.sodium.render.chunk.compile.tasks.TerrainBuildResult;
 import net.caffeinemc.sodium.render.chunk.compile.tasks.TerrainBuildTask;
 import net.caffeinemc.sodium.render.chunk.state.ChunkRenderBounds;
-import net.caffeinemc.sodium.render.chunk.state.ChunkRenderData;
+import net.caffeinemc.sodium.render.chunk.state.SectionRenderData;
 import net.caffeinemc.sodium.render.terrain.TerrainBuildContext;
 import net.caffeinemc.sodium.render.terrain.context.PreparedTerrainRenderCache;
 import net.caffeinemc.sodium.util.tasks.CancellationSource;
@@ -34,7 +34,7 @@ public class MixinTerrainBuildTask {
 		locals = LocalCapture.CAPTURE_FAILHARD)
 	private void iris$setLocalPos(TerrainBuildContext context,
 								  CancellationSource cancellationSource, CallbackInfoReturnable<TerrainBuildResult> cir,
-								  ChunkRenderData.Builder renderData, VisGraph occluder, ChunkRenderBounds.Builder bounds, TerrainBuildBuffers buffers,
+								  SectionRenderData.Builder renderData, VisGraph occluder, ChunkRenderBounds.Builder bounds, TerrainBuildBuffers buffers,
 								  PreparedTerrainRenderCache cacheLocal,
 								  WorldSlice slice, int baseX, int baseY, int baseZ, int maxX, int maxY, int maxZ,
 								  BlockPos.MutableBlockPos pos, BlockPos.MutableBlockPos renderOffset,

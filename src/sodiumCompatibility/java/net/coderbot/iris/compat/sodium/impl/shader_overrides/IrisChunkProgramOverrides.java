@@ -197,9 +197,9 @@ public class IrisChunkProgramOverrides {
 				this.programs.put(pass, createShader(device, pass, vertexType, pipeline));
 			}
 		}  else {
-			for (GlProgram<?> program : this.programs.values()) {
+			for (Program<IrisChunkShaderInterface> program : this.programs.values()) {
 				if (program != null) {
-					program.delete();
+					device.deleteProgram(program);
 				}
 			}
 			this.programs.clear();

@@ -120,19 +120,18 @@ public class MdbvChunkRendererIris extends AbstractIrisMdChunkRenderer<MdbvChunk
 			ChunkRenderPass renderPass = chunkRenderPasses[passId];
 			Deque<MdbvChunkRenderBatch> renderList = new ArrayDeque<>(128); // just an estimate, should be plenty
 
-			IntList passRegionIndices = lists.regionIndices[passId];
-			List<IntList> passModelPartCounts = lists.modelPartCounts[passId];
-			List<LongList> passModelPartSegments = lists.modelPartSegments[passId];
-			List<IntList> passSectionIndices = lists.sectionIndices[passId];
+			var pass = lists.builtPasses[passId];
+			IntList passRegionIndices = pass.regionIndices;
 			int passRegionCount = passRegionIndices.size();
 
 			boolean reverseOrder = renderPass.isTranslucent();
 
 			int regionIdx = reverseOrder ? passRegionCount - 1 : 0;
 			while (reverseOrder ? (regionIdx >= 0) : (regionIdx < passRegionCount)) {
-				IntList regionPassModelPartCounts = passModelPartCounts.get(regionIdx);
-				LongList regionPassModelPartSegments = passModelPartSegments.get(regionIdx);
-				IntList regionPassSectionIndices = passSectionIndices.get(regionIdx);
+				var builtRegion = pass.builtRegions.get(regionIdx);
+				IntList regionPassModelPartCounts = builtRegion.modelPartCounts;
+				LongList regionPassModelPartSegments = builtRegion.modelPartSegments;
+				IntList regionPassSectionIndices = builtRegion.sectionIndices;
 
 				int fullRegionIdx = passRegionIndices.getInt(regionIdx);
 				RenderRegion region = lists.regions.get(fullRegionIdx);
@@ -295,9 +294,9 @@ public class MdbvChunkRendererIris extends AbstractIrisMdChunkRenderer<MdbvChunk
 	protected static int unindexedTransformsBufferSize(int alignment, SortedTerrainLists lists) {
 		int size = 0;
 
-		for (List<LongList> passModelPartSegments : lists.modelPartSegments) {
-			for (LongList regionModelPartSegments : passModelPartSegments) {
-				size = MathUtil.align(size + (regionModelPartSegments.size() * TRANSFORM_STRUCT_STRIDE), alignment);
+		for (var pass : lists.builtPasses) {
+			for (var region : pass.builtRegions) {
+				size = MathUtil.align(size + (region.modelPartSegments.size() * TRANSFORM_STRUCT_STRIDE), alignment);
 			}
 		}
 
