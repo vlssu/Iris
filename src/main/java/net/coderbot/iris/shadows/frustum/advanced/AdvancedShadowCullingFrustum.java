@@ -1,10 +1,10 @@
 package net.coderbot.iris.shadows.frustum.advanced;
 
-import net.coderbot.iris.vendored.joml.Math;
+import org.joml.Math;
 import net.coderbot.iris.shadows.frustum.BoxCuller;
-import net.coderbot.iris.vendored.joml.Matrix4f;
-import net.coderbot.iris.vendored.joml.Vector3f;
-import net.coderbot.iris.vendored.joml.Vector4f;
+import org.joml.Matrix4f;
+import org.joml.Vector3f;
+import org.joml.Vector4f;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.world.phys.AABB;
 
@@ -73,7 +73,7 @@ public class AdvancedShadowCullingFrustum extends Frustum {
 	public AdvancedShadowCullingFrustum(Matrix4f playerView, Matrix4f playerProjection, Vector3f shadowLightVectorFromOrigin,
 										BoxCuller boxCuller) {
 		// We're overriding all of the methods, don't pass any matrices down.
-		super(new com.mojang.math.Matrix4f(), new com.mojang.math.Matrix4f());
+		super(new org.joml.Matrix4f(), new org.joml.Matrix4f());
 
 		this.shadowLightVectorFromOrigin = shadowLightVectorFromOrigin;
 		BaseClippingPlanes baseClippingPlanes = new BaseClippingPlanes(playerView, playerProjection);
@@ -278,6 +278,7 @@ public class AdvancedShadowCullingFrustum extends Frustum {
 		this.z = cameraZ;
 	}
 
+	@Override
 	public boolean isVisible(AABB aabb) {
 		if (boxCuller != null && boxCuller.isCulled(aabb)) {
 			return false;
@@ -324,13 +325,9 @@ public class AdvancedShadowCullingFrustum extends Frustum {
 	 * @return 0 if nothing is visible, 1 if everything is visible, 2 if only some corners are visible.
 	 */
 	private int checkCornerVisibility(float minX, float minY, float minZ, float maxX, float maxY, float maxZ) {
-		boolean inside = true;
 		float outsideBoundX;
 		float outsideBoundY;
 		float outsideBoundZ;
-		float insideBoundX;
-		float insideBoundY;
-		float insideBoundZ;
 
 		for (int i = 0; i < planeCount; ++i) {
 			Vector4f plane = this.planes[i];
@@ -340,35 +337,28 @@ public class AdvancedShadowCullingFrustum extends Frustum {
 
 			if (plane.x() < 0) {
 				outsideBoundX = minX;
-				insideBoundX = maxX;
 			} else {
 				outsideBoundX = maxX;
-				insideBoundX = minX;
 			}
 
 			if (plane.y() < 0) {
 				outsideBoundY = minY;
-				insideBoundY = maxY;
 			} else {
 				outsideBoundY = maxY;
-				insideBoundY = minY;
 			}
 
 			if (plane.z() < 0) {
 				outsideBoundZ = minZ;
-				insideBoundZ = maxZ;
 			} else {
 				outsideBoundZ = maxZ;
-				insideBoundZ = minZ;
 			}
 
 			if (Math.fma(plane.x(), outsideBoundX, Math.fma(plane.y(), outsideBoundY, plane.z() * outsideBoundZ)) < -plane.w()) {
 				return 0;
 			}
-			inside &= Math.fma(plane.x(), insideBoundX, Math.fma(plane.y(), insideBoundY, plane.z() * insideBoundZ)) >= -plane.w();
 		}
 
-		return inside ? 1 : 2;
+		return 2;
 	}
 
 	public int checkInfoSodium(float minX, float minY, float minZ, float maxX, float maxY, float maxZ, int prevMask) {

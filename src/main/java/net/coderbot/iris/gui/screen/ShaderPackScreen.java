@@ -1,7 +1,9 @@
 package net.coderbot.iris.gui.screen;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.coderbot.iris.Iris;
+import net.coderbot.iris.gl.GLDebug;
 import net.coderbot.iris.gui.GuiUtil;
 import net.coderbot.iris.gui.NavigationController;
 import net.coderbot.iris.gui.element.ShaderPackOptionList;
@@ -12,9 +14,12 @@ import net.coderbot.iris.shaderpack.ShaderPack;
 import net.irisshaders.iris.api.v0.IrisApi;
 import net.minecraft.ChatFormatting;
 import net.minecraft.Util;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.ImageButton;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.ConfirmLinkScreen;
+import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
@@ -104,6 +109,16 @@ public class ShaderPackScreen extends Screen implements HudHideable {
 			this.renderBackground(poseStack);
 		} else if (!this.guiHidden) {
 			this.fillGradient(poseStack, 0, 0, width, height, 0x4F232323, 0x4F232323);
+		}
+
+		if (InputConstants.isKeyDown(Minecraft.getInstance().getWindow().getWindow(), GLFW.GLFW_KEY_LEFT_CONTROL) && InputConstants.isKeyDown(Minecraft.getInstance().getWindow().getWindow(), GLFW.GLFW_KEY_D)) {
+			Minecraft.getInstance().setScreen(new ConfirmScreen((option) -> {
+				Iris.setDebug(option);
+				Minecraft.getInstance().setScreen(this);
+			}, Component.literal("Shader debug mode toggle"),
+				Component.literal("Debug mode helps investigate problems and shows shader errors. Would you like to enable it?"),
+				Component.literal("Yes"),
+				Component.literal("No")));
 		}
 
 		if (!this.guiHidden) {
@@ -220,20 +235,19 @@ public class ShaderPackScreen extends Screen implements HudHideable {
 				this.addRenderableWidget(shaderPackList);
 			}
 
-			this.addRenderableWidget(new Button(bottomCenter + 104, this.height - 27, 100, 20,
-				CommonComponents.GUI_DONE, button -> onClose()));
+			this.addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, button -> onClose()).bounds(bottomCenter + 104, this.height - 27, 100, 20
+				).build());
 
-			this.addRenderableWidget(new Button(bottomCenter, this.height - 27, 100, 20,
-				Component.translatable("options.iris.apply"), button -> this.applyChanges()));
+			this.addRenderableWidget(Button.builder(Component.translatable("options.iris.apply"), button -> this.applyChanges()).bounds(bottomCenter, this.height - 27, 100, 20
+				).build());
 
-			this.addRenderableWidget(new Button(bottomCenter - 104, this.height - 27, 100, 20,
-				CommonComponents.GUI_CANCEL, button -> this.dropChangesAndClose()));
+			this.addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, button -> this.dropChangesAndClose()).bounds(bottomCenter - 104, this.height - 27, 100, 20
+				).build());
 
-			this.addRenderableWidget(new Button(topCenter - 78, this.height - 51, 152, 20,
-				Component.translatable("options.iris.openShaderPackFolder"), button -> openShaderPackFolder()));
+			this.addRenderableWidget(Button.builder(Component.translatable("options.iris.openShaderPackFolder"), button -> openShaderPackFolder()).bounds(topCenter - 78, this.height - 51, 152, 20
+				).build());
 
-			this.screenSwitchButton = this.addRenderableWidget(new Button(topCenter + 78, this.height - 51, 152, 20,
-				Component.translatable("options.iris.shaderPackList"), button -> {
+			this.screenSwitchButton = this.addRenderableWidget(Button.builder(Component.translatable("options.iris.shaderPackList"), button -> {
 					this.optionMenuOpen = !this.optionMenuOpen;
 
 					// UX: Apply changes before switching screens to avoid unintuitive behavior
@@ -245,7 +259,8 @@ public class ShaderPackScreen extends Screen implements HudHideable {
 
 					this.init();
 				}
-			));
+			).bounds(topCenter + 78, this.height - 51, 152, 20
+				).build());
 
 			refreshScreenSwitchButton();
 		}
@@ -266,24 +281,23 @@ public class ShaderPackScreen extends Screen implements HudHideable {
 				x = (int) (endOfLastButton + (freeSpace / 2.0f)) - 10;
 			}
 
-			this.addRenderableWidget(new ImageButton(
+			ImageButton showHideButton = new ImageButton(
 				x, this.height - 39,
 				20, 20,
 				this.guiHidden ? 20 : 0, 146, 20,
 				GuiUtil.IRIS_WIDGETS_TEX,
 				256, 256,
-				button -> {
+				(button) -> {
 					this.guiHidden = !this.guiHidden;
 					this.init();
 				},
-				(button, poseStack, i, j) -> {
-					this.guiButtonHoverTimer += this.minecraft.getDeltaFrameTime();
-					if (this.guiButtonHoverTimer >= 10.0f) {
-						TOP_LAYER_RENDER_QUEUE.add(() -> this.renderTooltip(poseStack, showOrHide, i, j));
-					}
-				},
 				showOrHide
-			));
+			);
+
+			showHideButton.setTooltip(Tooltip.create(showOrHide));
+			showHideButton.setTooltipDelay(10);
+
+			this.addRenderableWidget(showHideButton);
 		}
 
 		// NB: Don't let comment remain when exiting options screen

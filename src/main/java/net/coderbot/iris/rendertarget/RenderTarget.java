@@ -5,7 +5,7 @@ import net.coderbot.iris.gl.IrisRenderSystem;
 import net.coderbot.iris.gl.texture.InternalTextureFormat;
 import net.coderbot.iris.gl.texture.PixelFormat;
 import net.coderbot.iris.gl.texture.PixelType;
-import net.coderbot.iris.vendored.joml.Vector2i;
+import org.joml.Vector2i;
 import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL13C;
 
@@ -41,19 +41,20 @@ public class RenderTarget {
 		this.mainTexture = textures[0];
 		this.altTexture = textures[1];
 
-		setupTexture(mainTexture, builder.width, builder.height);
-		setupTexture(altTexture, builder.width, builder.height);
+		boolean isPixelFormatInteger = builder.internalFormat.getPixelFormat().isInteger();
+		setupTexture(mainTexture, builder.width, builder.height, !isPixelFormatInteger);
+		setupTexture(altTexture, builder.width, builder.height, !isPixelFormatInteger);
 
 		// Clean up after ourselves
 		// This is strictly defensive to ensure that other buggy code doesn't tamper with our textures
 		GlStateManager._bindTexture(0);
 	}
 
-	private void setupTexture(int texture, int width, int height) {
+	private void setupTexture(int texture, int width, int height, boolean allowsLinear) {
 		resizeTexture(texture, width, height);
 
-		IrisRenderSystem.texParameteri(texture, GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MIN_FILTER, GL11C.GL_LINEAR);
-		IrisRenderSystem.texParameteri(texture, GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MAG_FILTER, GL11C.GL_LINEAR);
+		IrisRenderSystem.texParameteri(texture, GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MIN_FILTER, allowsLinear ? GL11C.GL_LINEAR : GL11C.GL_NEAREST);
+		IrisRenderSystem.texParameteri(texture, GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MAG_FILTER, allowsLinear ? GL11C.GL_LINEAR : GL11C.GL_NEAREST);
 		IrisRenderSystem.texParameteri(texture, GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_S, GL13C.GL_CLAMP_TO_EDGE);
 		IrisRenderSystem.texParameteri(texture, GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_T, GL13C.GL_CLAMP_TO_EDGE);
 	}

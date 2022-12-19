@@ -3,10 +3,13 @@ package net.coderbot.iris;
 import com.google.common.base.Throwables;
 import com.mojang.blaze3d.platform.GlDebug;
 import com.mojang.blaze3d.platform.InputConstants;
+import com.mojang.bridge.game.GameVersion;
 import net.coderbot.iris.compat.sodium.SodiumVersionCheck;
 import net.coderbot.iris.config.IrisConfig;
 import net.coderbot.iris.gl.GLDebug;
+import net.coderbot.iris.gl.shader.ShaderCompileException;
 import net.coderbot.iris.gl.shader.StandardMacros;
+import net.coderbot.iris.gui.debug.DebugLoadFailedGridScreen;
 import net.coderbot.iris.gui.screen.ShaderPackScreen;
 import net.coderbot.iris.pipeline.FixedFunctionWorldRenderingPipeline;
 import net.coderbot.iris.pipeline.PipelineManager;
@@ -27,10 +30,12 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 import net.fabricmc.loader.api.Version;
 import net.minecraft.ChatFormatting;
+import net.minecraft.SharedConstants;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 
+import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.dimension.BuiltinDimensionTypes;
@@ -74,6 +79,7 @@ public class Iris {
 	private static ShaderPack currentPack;
 	private static String currentPackName;
 	private static boolean sodiumInvalid;
+	private static boolean hasNEC;
 	private static boolean sodiumInstalled;
 	private static boolean initialized;
 
@@ -93,6 +99,9 @@ public class Iris {
 	private static Version IRIS_VERSION;
 	private static UpdateChecker updateChecker;
 	private static boolean fallback;
+
+	// Change this for snapshots!
+	private static String backupVersionNumber = "1.19.3";
 
 	/**
 	 * Called very early on in Minecraft initialization. At this point we *cannot* safely access OpenGL, but we can do
@@ -117,12 +126,18 @@ public class Iris {
 				}
 		);
 
+		hasNEC = FabricLoader.getInstance().isModLoaded("notenoughcrashes");
+
 		ModContainer iris = FabricLoader.getInstance().getModContainer(MODID)
 				.orElseThrow(() -> new IllegalStateException("Couldn't find the mod container for Iris"));
 
 		IRIS_VERSION = iris.getMetadata().getVersion();
 
 		this.updateChecker = new UpdateChecker(IRIS_VERSION);
+
+		reloadKeybind = KeyBindingHelper.registerKeyBinding(new KeyMapping("iris.keybind.reload", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R, "iris.keybinds"));
+		toggleShadersKeybind = KeyBindingHelper.registerKeyBinding(new KeyMapping("iris.keybind.toggleShaders", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_K, "iris.keybinds"));
+		shaderpackScreenKeybind = KeyBindingHelper.registerKeyBinding(new KeyMapping("iris.keybind.shaderPackSelection", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_O, "iris.keybinds"));
 
 		try {
 			if (!Files.exists(getShaderpacksDirectory())) {
@@ -143,10 +158,6 @@ public class Iris {
 		}
 
 		this.updateChecker.checkForUpdates(irisConfig);
-
-		reloadKeybind = KeyBindingHelper.registerKeyBinding(new KeyMapping("iris.keybind.reload", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R, "iris.keybinds"));
-		toggleShadersKeybind = KeyBindingHelper.registerKeyBinding(new KeyMapping("iris.keybind.toggleShaders", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_K, "iris.keybinds"));
-		shaderpackScreenKeybind = KeyBindingHelper.registerKeyBinding(new KeyMapping("iris.keybind.shaderPackSelection", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_O, "iris.keybinds"));
 
 		setupCommands(Minecraft.getInstance());
 
@@ -430,7 +441,7 @@ public class Iris {
 		logger.info("Shaders are disabled");
 	}
 
-	private static void setDebug(boolean enable) {
+	public static void setDebug(boolean enable) {
 		int success;
 		if (enable) {
 			success = GLDebug.setupDebugMessageCallback();
@@ -652,6 +663,9 @@ public class Iris {
 		try {
 			return new NewWorldRenderingPipeline(programs);
 		} catch (Exception e) {
+			if (irisConfig.areDebugOptionsEnabled()) {
+				Minecraft.getInstance().setScreen(new DebugLoadFailedGridScreen(Minecraft.getInstance().screen, Component.literal(e instanceof ShaderCompileException ? "Failed to compile shaders" : "Exception"), e));
+			}
 			logger.error("Failed to create shader rendering pipeline, disabling shaders!", e);
 			// TODO: This should be reverted if a dimension change causes shaders to compile again
 			fallback = true;
@@ -716,12 +730,29 @@ public class Iris {
 		return color + version;
 	}
 
+	/**
+	 * Gets the current release target. Since 1.19.3, Mojang no longer stores this information, so we must manually provide it for snapshots.
+	 * @return Release target
+	 */
+	public static String getReleaseTarget() {
+		// If this is a snapshot, you must change backupVersionNumber!
+		return SharedConstants.getCurrentVersion().isStable() ? SharedConstants.getCurrentVersion().getName() : backupVersionNumber;
+	}
+
+	public static String getBackupVersionNumber() {
+		return backupVersionNumber;
+	}
+
 	public static boolean isSodiumInvalid() {
 		return sodiumInvalid;
   }
 
 	public static boolean isSodiumInstalled() {
 		return sodiumInstalled;
+	}
+
+	public static boolean hasNotEnoughCrashes() {
+		return hasNEC;
 	}
 
 	public static Path getShaderpacksDirectory() {

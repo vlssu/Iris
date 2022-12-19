@@ -3,7 +3,7 @@ package net.coderbot.iris.shaderpack;
 import com.google.common.collect.ImmutableList;
 import net.coderbot.iris.Iris;
 import net.coderbot.iris.gl.texture.InternalTextureFormat;
-import net.coderbot.iris.vendored.joml.Vector4f;
+import org.joml.Vector4f;
 
 import java.util.Optional;
 
@@ -12,6 +12,8 @@ public class PackShadowDirectives {
 	// This is currently set at 2 for ShadersMod / OptiFine parity but can theoretically be bumped up to 8.
 	// TODO: Make this configurable?
 	public static final int MAX_SHADOW_COLOR_BUFFERS = 2;
+
+	private final OptionalBoolean shadowEnabled;
 
 	private int resolution;
 	// Use a boxed form so we can use null to indicate that there is not an FOV specified.
@@ -77,6 +79,7 @@ public class PackShadowDirectives {
 		this.shouldRenderPlayer = properties.getShadowPlayer().orElse(false);
 		this.shouldRenderBlockEntities = properties.getShadowBlockEntities().orElse(true);
 		this.cullingState = properties.getShadowCulling();
+		this.shadowEnabled = properties.getShadowEnabled();
 
 		this.depthSamplingSettings = ImmutableList.of(new DepthSamplingSettings(), new DepthSamplingSettings());
 
@@ -105,6 +108,7 @@ public class PackShadowDirectives {
 		this.cullingState = shadowDirectives.cullingState;
 		this.depthSamplingSettings = shadowDirectives.depthSamplingSettings;
 		this.colorSamplingSettings = shadowDirectives.colorSamplingSettings;
+		this.shadowEnabled = shadowDirectives.shadowEnabled;
 	}
 
 	public int getResolution() {
@@ -157,6 +161,10 @@ public class PackShadowDirectives {
 
 	public OptionalBoolean getCullingState() {
 		return cullingState;
+	}
+
+	public OptionalBoolean isShadowEnabled() {
+		return shadowEnabled;
 	}
 
 	public ImmutableList<DepthSamplingSettings> getDepthSamplingSettings() {

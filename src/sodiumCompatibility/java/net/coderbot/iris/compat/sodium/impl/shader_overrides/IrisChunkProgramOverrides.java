@@ -186,9 +186,9 @@ public class IrisChunkProgramOverrides {
 	}
 
 	private void createShaders(int maxDrawCount, SodiumTerrainPipeline pipeline, RenderDevice device, TerrainVertexType vertexType, boolean baseInstanced) {
-		this.programs.clear();
 
 		if (pipeline != null) {
+			this.programs.clear();
 			pipeline.patchShaders(maxDrawCount, vertexType.getVertexRange(), baseInstanced);
 			for (IrisTerrainPass pass : IrisTerrainPass.values()) {
 				if (!pipeline.hasShadowPass() && pass.isShadow()) {
@@ -196,6 +196,13 @@ public class IrisChunkProgramOverrides {
 				}
 				this.programs.put(pass, createShader(device, pass, vertexType, pipeline));
 			}
+		}  else {
+			for (GlProgram<?> program : this.programs.values()) {
+				if (program != null) {
+					program.delete();
+				}
+			}
+			this.programs.clear();
 		}
 
 		shadersCreated = true;

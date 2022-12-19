@@ -19,6 +19,7 @@ import net.coderbot.iris.gl.program.ProgramBuilder;
 import net.coderbot.iris.gl.program.ProgramSamplers;
 import net.coderbot.iris.gl.program.ProgramUniforms;
 import net.coderbot.iris.gl.sampler.SamplerLimits;
+import net.coderbot.iris.gl.shader.ShaderCompileException;
 import net.coderbot.iris.rendertarget.RenderTarget;
 import net.coderbot.iris.pipeline.PatchedShaderPrinter;
 import net.coderbot.iris.pipeline.transform.PatchShaderType;
@@ -36,7 +37,6 @@ import net.coderbot.iris.shaderpack.ProgramSource;
 import net.coderbot.iris.shadows.ShadowRenderTargets;
 import net.coderbot.iris.uniforms.CommonUniforms;
 import net.coderbot.iris.uniforms.FrameUpdateNotifier;
-import net.coderbot.iris.vendored.joml.Vector3i;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.opengl.GL15C;
 import org.lwjgl.opengl.GL20C;
@@ -174,7 +174,7 @@ public class CompositeRenderer {
 		}
 	}
 
-	private class Pass {
+	private static class Pass {
 		int[] drawBuffers;
 		int viewWidth;
 		int viewHeight;
@@ -285,7 +285,13 @@ public class CompositeRenderer {
 		// Also note that this only applies to one of the two buffers in a render target buffer pair - making it
 		// unlikely that this issue occurs in practice with most shader packs.
 		IrisRenderSystem.generateMipmaps(texture, GL20C.GL_TEXTURE_2D);
-		IrisRenderSystem.texParameteri(texture, GL20C.GL_TEXTURE_2D, GL20C.GL_TEXTURE_MIN_FILTER, GL20C.GL_LINEAR_MIPMAP_LINEAR);
+
+		int filter = GL20C.GL_LINEAR_MIPMAP_LINEAR;
+		if (target.getInternalFormat().getPixelFormat().isInteger()) {
+			filter = GL20C.GL_NEAREST_MIPMAP_NEAREST;
+		}
+
+		IrisRenderSystem.texParameteri(texture, GL20C.GL_TEXTURE_2D, GL20C.GL_TEXTURE_MIN_FILTER, filter);
 	}
 
 	// TODO: Don't just copy this from DeferredWorldRenderingPipeline
@@ -307,6 +313,8 @@ public class CompositeRenderer {
 		try {
 			builder = ProgramBuilder.begin(source.getName(), vertex, geometry, fragment,
 					IrisSamplers.COMPOSITE_RESERVED_TEXTURE_UNITS);
+		} catch (ShaderCompileException e) {
+			throw e;
 		} catch (RuntimeException e) {
 			// TODO: Better error handling
 			throw new RuntimeException("Shader compilation failed!", e);
@@ -327,7 +335,7 @@ public class CompositeRenderer {
 		}
 
 		// TODO: Don't duplicate this with FinalPassRenderer
-		builder.addDynamicSampler(centerDepthSampler::getCenterDepthTexture, "iris_centerDepthSmooth");
+		centerDepthSampler.setUsage(builder.addDynamicSampler(centerDepthSampler::getCenterDepthTexture, "iris_centerDepthSmooth"));
 
 		return builder.build();
 	}
@@ -345,6 +353,8 @@ public class CompositeRenderer {
 
 				try {
 					builder = ProgramBuilder.beginCompute(source.getName(), source.getSource().orElse(null), IrisSamplers.COMPOSITE_RESERVED_TEXTURE_UNITS);
+				} catch (ShaderCompileException e) {
+					throw e;
 				} catch (RuntimeException e) {
 					// TODO: Better error handling
 					throw new RuntimeException("Shader compilation failed!", e);
@@ -365,7 +375,7 @@ public class CompositeRenderer {
 				}
 
 				// TODO: Don't duplicate this with FinalPassRenderer
-				builder.addDynamicSampler(centerDepthSampler::getCenterDepthTexture, "iris_centerDepthSmooth");
+				centerDepthSampler.setUsage(builder.addDynamicSampler(centerDepthSampler::getCenterDepthTexture, "iris_centerDepthSmooth"));
 
 				programs[i] = builder.buildCompute();
 

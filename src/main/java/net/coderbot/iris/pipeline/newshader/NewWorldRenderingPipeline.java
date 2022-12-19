@@ -10,6 +10,7 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectMaps;
 import net.coderbot.iris.block_rendering.BlockMaterialMapping;
 import net.coderbot.iris.block_rendering.BlockRenderingSettings;
 import net.coderbot.iris.gbuffer_overrides.matching.InputAvailability;
+import net.coderbot.iris.gbuffer_overrides.matching.RenderCondition;
 import net.coderbot.iris.gbuffer_overrides.matching.SpecialCondition;
 import net.coderbot.iris.gbuffer_overrides.state.RenderTargetStateListener;
 import net.coderbot.iris.gl.blending.AlphaTest;
@@ -17,10 +18,12 @@ import net.coderbot.iris.gl.blending.BlendModeOverride;
 import net.coderbot.iris.gl.framebuffer.GlFramebuffer;
 import net.coderbot.iris.gl.image.ImageHolder;
 import net.coderbot.iris.gl.program.ComputeProgram;
+import net.coderbot.iris.gl.program.Program;
 import net.coderbot.iris.gl.program.ProgramBuilder;
 import net.coderbot.iris.gl.program.ProgramImages;
 import net.coderbot.iris.gl.program.ProgramSamplers;
 import net.coderbot.iris.gl.sampler.SamplerHolder;
+import net.coderbot.iris.gl.shader.ShaderCompileException;
 import net.coderbot.iris.gl.state.StateUpdateNotifiers;
 import net.coderbot.iris.gl.texture.DepthBufferFormat;
 import net.coderbot.iris.mixin.GlStateManagerAccessor;
@@ -47,6 +50,7 @@ import net.coderbot.iris.samplers.IrisImages;
 import net.coderbot.iris.samplers.IrisSamplers;
 import net.coderbot.iris.shaderpack.CloudSetting;
 import net.coderbot.iris.shaderpack.ComputeSource;
+import net.coderbot.iris.shaderpack.OptionalBoolean;
 import net.coderbot.iris.shaderpack.PackDirectives;
 import net.coderbot.iris.shaderpack.PackShadowDirectives;
 import net.coderbot.iris.shaderpack.ProgramFallbackResolver;
@@ -64,15 +68,16 @@ import net.coderbot.iris.texture.pbr.PBRType;
 import net.coderbot.iris.uniforms.CapturedRenderingState;
 import net.coderbot.iris.uniforms.CommonUniforms;
 import net.coderbot.iris.uniforms.FrameUpdateNotifier;
-import net.coderbot.iris.vendored.joml.Vector3d;
-import net.coderbot.iris.vendored.joml.Vector4f;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.DimensionSpecialEffects;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.client.renderer.texture.AbstractTexture;
+import net.minecraft.client.renderer.texture.DynamicTexture;
 import org.jetbrains.annotations.Nullable;
+import org.joml.Vector3d;
+import org.joml.Vector4f;
 import org.lwjgl.opengl.GL15C;
 import org.lwjgl.opengl.GL20C;
 import org.lwjgl.opengl.GL21C;
@@ -112,7 +117,7 @@ public class NewWorldRenderingPipeline implements WorldRenderingPipeline, CoreWo
 	private final FinalPassRenderer finalPassRenderer;
 
 	private final CustomTextureManager customTextureManager;
-	private final AbstractTexture whitePixel;
+	private final DynamicTexture whitePixel;
 	private final FrameUpdateNotifier updateNotifier;
 	private final CenterDepthSampler centerDepthSampler;
 	private final SodiumTerrainPipeline sodiumTerrainPipeline;
@@ -204,7 +209,7 @@ public class NewWorldRenderingPipeline implements WorldRenderingPipeline, CoreWo
 
 		BufferFlipper flipper = new BufferFlipper();
 
-		this.centerDepthSampler = new CenterDepthSampler(renderTargets, programSet.getPackDirectives().getCenterDepthHalfLife());
+		this.centerDepthSampler = new CenterDepthSampler(() -> renderTargets.getDepthTexture(), programSet.getPackDirectives().getCenterDepthHalfLife());
 
 		this.shadowMapResolution = programSet.getPackDirectives().getShadowDirectives().getResolution();
 
@@ -338,6 +343,9 @@ public class NewWorldRenderingPipeline implements WorldRenderingPipeline, CoreWo
 				} else {
 					return createShader(key.getName(), resolver.resolve(key.getProgram()), key);
 				}
+			} catch (FakeChainedJsonException e) {
+				destroyShaders();
+				throw e.getTrueException();
 			} catch (IOException e) {
 				destroyShaders();
 				throw new RuntimeException(e);
@@ -362,6 +370,10 @@ public class NewWorldRenderingPipeline implements WorldRenderingPipeline, CoreWo
 		this.clearPasses = ClearPassCreator.createClearPasses(renderTargets, false,
 				programSet.getPackDirectives().getRenderTargetDirectives());
 
+		if (shadowRenderTargets == null && shadowDirectives.isShadowEnabled() == OptionalBoolean.TRUE) {
+			shadowRenderTargets = new ShadowRenderTargets(shadowMapResolution, shadowDirectives);
+		}
+
 		if (shadowRenderTargets != null) {
 			ShaderInstance shader = shaderMap.getShader(ShaderKey.SHADOW_TERRAIN_CUTOUT);
 			boolean shadowUsesImages = false;
@@ -374,8 +386,13 @@ public class NewWorldRenderingPipeline implements WorldRenderingPipeline, CoreWo
 			this.shadowClearPasses = ClearPassCreator.createShadowClearPasses(shadowRenderTargets, false, shadowDirectives);
 			this.shadowClearPassesFull = ClearPassCreator.createShadowClearPasses(shadowRenderTargets, true, shadowDirectives);
 
-			this.shadowRenderer = new ShadowRenderer(programSet.getShadow().orElse(null),
-				programSet.getPackDirectives(), shadowRenderTargets, shadowUsesImages);
+			if (programSet.getPackDirectives().getShadowDirectives().isShadowEnabled().orElse(true)) {
+				this.shadowRenderer = new ShadowRenderer(programSet.getShadow().orElse(null),
+					programSet.getPackDirectives(), shadowRenderTargets, shadowUsesImages);
+			} else {
+				shadowRenderer = null;
+			}
+
 		} else {
 			this.shadowClearPasses = ImmutableList.of();
 			this.shadowClearPassesFull = ImmutableList.of();
@@ -400,6 +417,8 @@ public class NewWorldRenderingPipeline implements WorldRenderingPipeline, CoreWo
 
 				try {
 					builder = ProgramBuilder.beginCompute(source.getName(), TransformPatcher.patchCompute(source.getSource().orElse(null)), IrisSamplers.WORLD_RESERVED_TEXTURE_UNITS);
+				} catch (ShaderCompileException e) {
+					throw e;
 				} catch (RuntimeException e) {
 					// TODO: Better error handling
 					throw new RuntimeException("Shader compilation failed!", e);
@@ -625,30 +644,39 @@ public class NewWorldRenderingPipeline implements WorldRenderingPipeline, CoreWo
 
 		// Make sure we're using texture unit 0 for this.
 		RenderSystem.activeTexture(GL15C.GL_TEXTURE0);
+		Vector4f emptyClearColor = new Vector4f(1.0F);
 
 		if (shadowRenderTargets != null) {
-			// Clear depth first, regardless of any color clearing.
-			shadowRenderTargets.getDepthSourceFb().bind();
-			RenderSystem.clear(GL21C.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
-
-			Vector4f emptyClearColor = new Vector4f(1.0F);
-			ImmutableList<ClearPass> passes;
-
-			for (ComputeProgram computeProgram : shadowComputes) {
-				if (computeProgram != null) {
-					computeProgram.dispatch(shadowMapResolution, shadowMapResolution);
+			if (packDirectives.getShadowDirectives().isShadowEnabled() == OptionalBoolean.FALSE) {
+				if (shadowRenderTargets.isFullClearRequired()) {
+					shadowRenderTargets.onFullClear();
+					for (ClearPass clearPass : shadowClearPassesFull) {
+						clearPass.execute(emptyClearColor);
+					}
 				}
-			}
-
-			if (shadowRenderTargets.isFullClearRequired()) {
-				passes = shadowClearPassesFull;
-				shadowRenderTargets.onFullClear();
 			} else {
-				passes = shadowClearPasses;
-			}
+				// Clear depth first, regardless of any color clearing.
+				shadowRenderTargets.getDepthSourceFb().bind();
+				RenderSystem.clear(GL21C.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
 
-			for (ClearPass clearPass : passes) {
-				clearPass.execute(emptyClearColor);
+				ImmutableList<ClearPass> passes;
+
+				for (ComputeProgram computeProgram : shadowComputes) {
+					if (computeProgram != null) {
+						computeProgram.dispatch(shadowMapResolution, shadowMapResolution);
+					}
+				}
+
+				if (shadowRenderTargets.isFullClearRequired()) {
+					passes = shadowClearPassesFull;
+					shadowRenderTargets.onFullClear();
+				} else {
+					passes = shadowClearPasses;
+				}
+
+				for (ClearPass clearPass : passes) {
+					clearPass.execute(emptyClearColor);
+				}
 			}
 		}
 
@@ -896,9 +924,13 @@ public class NewWorldRenderingPipeline implements WorldRenderingPipeline, CoreWo
 			RenderSystem.setShaderTexture(i, 0);
 		}
 
+		prepareRenderer.destroy();
 		compositeRenderer.destroy();
+		deferredRenderer.destroy();
+		finalPassRenderer.destroy();
+		centerDepthSampler.destroy();
 		customTextureManager.destroy();
-		whitePixel.releaseId();
+		whitePixel.close();
 
 		horizonRenderer.destroy();
 

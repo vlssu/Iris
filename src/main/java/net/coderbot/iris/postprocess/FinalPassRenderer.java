@@ -12,6 +12,7 @@ import net.coderbot.iris.gl.program.ComputeProgram;
 import net.coderbot.iris.gl.program.Program;
 import net.coderbot.iris.gl.program.ProgramBuilder;
 import net.coderbot.iris.gl.program.ProgramSamplers;
+import net.coderbot.iris.gl.shader.ShaderCompileException;
 import net.coderbot.iris.gl.shader.ShaderType;
 import net.coderbot.iris.gl.program.ProgramUniforms;
 import net.coderbot.iris.gl.sampler.SamplerLimits;
@@ -32,7 +33,6 @@ import net.coderbot.iris.shaderpack.ProgramSource;
 import net.coderbot.iris.shadows.ShadowRenderTargets;
 import net.coderbot.iris.uniforms.CommonUniforms;
 import net.coderbot.iris.uniforms.FrameUpdateNotifier;
-import net.coderbot.iris.vendored.joml.Vector3i;
 import net.minecraft.client.Minecraft;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL11C;
@@ -287,15 +287,25 @@ public class FinalPassRenderer {
 		// Also note that this only applies to one of the two buffers in a render target buffer pair - making it
 		// unlikely that this issue occurs in practice with most shader packs.
 		IrisRenderSystem.generateMipmaps(texture, GL20C.GL_TEXTURE_2D);
-		IrisRenderSystem.texParameteri(texture, GL20C.GL_TEXTURE_2D, GL20C.GL_TEXTURE_MIN_FILTER, GL20C.GL_LINEAR_MIPMAP_LINEAR);
+
+		int filter = GL20C.GL_LINEAR_MIPMAP_LINEAR;
+		if (target.getInternalFormat().getPixelFormat().isInteger()) {
+			filter = GL20C.GL_NEAREST_MIPMAP_NEAREST;
+		}
+
+		IrisRenderSystem.texParameteri(texture, GL20C.GL_TEXTURE_2D, GL20C.GL_TEXTURE_MIN_FILTER, filter);
 	}
 
 	private static void resetRenderTarget(RenderTarget target) {
 		// Resets the sampling mode of the given render target and then unbinds it to prevent accidental sampling of it
 		// elsewhere.
-		IrisRenderSystem.texParameteri(target.getMainTexture(), GL20C.GL_TEXTURE_2D, GL20C.GL_TEXTURE_MIN_FILTER, GL20C.GL_LINEAR);
+		int filter = GL20C.GL_LINEAR;
+		if (target.getInternalFormat().getPixelFormat().isInteger()) {
+			filter = GL20C.GL_NEAREST;
+		}
 
-		IrisRenderSystem.texParameteri(target.getAltTexture(), GL20C.GL_TEXTURE_2D, GL20C.GL_TEXTURE_MIN_FILTER, GL20C.GL_LINEAR);
+		IrisRenderSystem.texParameteri(target.getMainTexture(), GL20C.GL_TEXTURE_2D, GL20C.GL_TEXTURE_MIN_FILTER, filter);
+		IrisRenderSystem.texParameteri(target.getAltTexture(), GL20C.GL_TEXTURE_2D, GL20C.GL_TEXTURE_MIN_FILTER, filter);
 
 		RenderSystem.bindTexture(0);
 	}
@@ -320,6 +330,8 @@ public class FinalPassRenderer {
 		try {
 			builder = ProgramBuilder.begin(source.getName(), vertex, geometry, fragment,
 					IrisSamplers.COMPOSITE_RESERVED_TEXTURE_UNITS);
+		} catch (ShaderCompileException e) {
+			throw e;
 		} catch (RuntimeException e) {
 			// TODO: Better error handling
 			throw new RuntimeException("Shader compilation failed!", e);
@@ -339,7 +351,7 @@ public class FinalPassRenderer {
 		}
 
 		// TODO: Don't duplicate this with CompositeRenderer
-		builder.addDynamicSampler(centerDepthSampler::getCenterDepthTexture, "iris_centerDepthSmooth");
+		centerDepthSampler.setUsage(builder.addDynamicSampler(centerDepthSampler::getCenterDepthTexture, "iris_centerDepthSmooth"));
 
 		return builder.build();
 	}
@@ -357,6 +369,8 @@ public class FinalPassRenderer {
 
 				try {
 					builder = ProgramBuilder.beginCompute(source.getName(), source.getSource().orElse(null), IrisSamplers.COMPOSITE_RESERVED_TEXTURE_UNITS);
+				} catch (ShaderCompileException e) {
+					throw e;
 				} catch (RuntimeException e) {
 					// TODO: Better error handling
 					throw new RuntimeException("Shader compilation failed!", e);
@@ -377,7 +391,7 @@ public class FinalPassRenderer {
 				}
 
 				// TODO: Don't duplicate this with FinalPassRenderer
-				builder.addDynamicSampler(centerDepthSampler::getCenterDepthTexture, "iris_centerDepthSmooth");
+				centerDepthSampler.setUsage(builder.addDynamicSampler(centerDepthSampler::getCenterDepthTexture, "iris_centerDepthSmooth"));
 
 				programs[i] = builder.buildCompute();
 
@@ -393,5 +407,6 @@ public class FinalPassRenderer {
 		if (finalPass != null) {
 			finalPass.destroy();
 		}
+		colorHolder.destroy();
 	}
 }
