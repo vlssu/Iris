@@ -6,6 +6,7 @@ import org.jetbrains.annotations.Nullable;
 public class PBRSpriteHolder {
 	protected TextureAtlasSprite normalSprite;
 	protected TextureAtlasSprite specularSprite;
+	protected TextureAtlasSprite metalnessSprite;
 
 	@Nullable
 	public TextureAtlasSprite getNormalSprite() {
@@ -17,12 +18,21 @@ public class PBRSpriteHolder {
 		return specularSprite;
 	}
 
+	@Nullable
+	public TextureAtlasSprite getMetalnessSprite() {
+		return metalnessSprite;
+	}
+
 	public void setNormalSprite(TextureAtlasSprite sprite) {
 		normalSprite = sprite;
 	}
 
 	public void setSpecularSprite(TextureAtlasSprite sprite) {
 		specularSprite = sprite;
+	}
+
+	public void setMetalnessSprite(TextureAtlasSprite sprite) {
+		this.metalnessSprite = sprite;
 	}
 
 	public void close() {
@@ -32,6 +42,9 @@ public class PBRSpriteHolder {
 		}
 		if (specularSprite != null) {
 			specularSprite.contents().close();
+		}
+		if (metalnessSprite != null) {
+			metalnessSprite.contents().close();
 		}
 	}
 }

@@ -86,6 +86,9 @@ public class PBRAtlasTexture extends AbstractTexture {
 			case SPECULAR:
 				pbrHolder.setSpecularAtlas(this);
 				break;
+			case METALNESS:
+				pbrHolder.setMetalnessAtlas(this);
+				break;
 		}
 
 		if (PBRTextureManager.DEBUG) {
@@ -159,6 +162,9 @@ public class PBRAtlasTexture extends AbstractTexture {
 				break;
 			case SPECULAR:
 				pbrHolder.setSpecularAtlas(null);
+				break;
+			case METALNESS:
+				pbrHolder.setMetalnessAtlas(null);
 				break;
 			}
 		}

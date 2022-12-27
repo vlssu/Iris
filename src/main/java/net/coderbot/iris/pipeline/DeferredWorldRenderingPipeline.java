@@ -1315,6 +1315,11 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 	}
 
 	@Override
+	public int getCurrentMetalnessTexture() {
+		return 0;
+	}
+
+	@Override
 	public void onSetShaderTexture(int id) {
 		if (shouldBindPBR && isRenderingWorld) {
 			PBRTextureHolder pbrHolder = PBRTextureManager.INSTANCE.getOrLoadHolder(id);
@@ -1325,6 +1330,7 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 			if (textureFormat != null) {
 				textureFormat.setupTextureParameters(PBRType.NORMAL, pbrHolder.getNormalTexture());
 				textureFormat.setupTextureParameters(PBRType.SPECULAR, pbrHolder.getSpecularTexture());
+				textureFormat.setupTextureParameters(PBRType.METALNESS, pbrHolder.getMetalnessTexture());
 			}
 
 			PBRTextureManager.notifyPBRTexturesChanged();

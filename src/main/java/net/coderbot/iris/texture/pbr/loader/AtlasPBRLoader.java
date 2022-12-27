@@ -55,23 +55,30 @@ public class AtlasPBRLoader implements PBRTextureLoader<TextureAtlas> {
 
 	private Object2ObjectMap<TextureAtlas, PBRAtlasTexture> normalAtlases = new Object2ObjectOpenHashMap<>();
 	private Object2ObjectMap<TextureAtlas, PBRAtlasTexture> specularAtlases = new Object2ObjectOpenHashMap<>();
+	private Object2ObjectMap<TextureAtlas, PBRAtlasTexture> metalnessAtlases = new Object2ObjectOpenHashMap<>();
 
 	public void removeAtlasInformation(TextureAtlas atlas) {
 		normalAtlases.remove(atlas);
 		specularAtlases.remove(atlas);
+		metalnessAtlases.remove(atlas);
 	}
 
 	@Override
 	public void load(TextureAtlas atlas, ResourceManager resourceManager, PBRTextureConsumer pbrTextureConsumer) {
-		boolean acceptedNormalAtlas = false, acceptedSpecularAtlas = false;
+		boolean acceptedNormalAtlas = false, acceptedSpecularAtlas = false, acceptedMetalnessAtlas = false;
 		if (normalAtlases.containsKey(atlas)) {
 			pbrTextureConsumer.acceptNormalTexture(normalAtlases.get(atlas));
 			acceptedNormalAtlas = true;
 		}
 
 		if (specularAtlases.containsKey(atlas)) {
-			pbrTextureConsumer.acceptNormalTexture(specularAtlases.get(atlas));
+			pbrTextureConsumer.acceptSpecularTexture(specularAtlases.get(atlas));
 			acceptedSpecularAtlas = true;
+		}
+
+		if (metalnessAtlases.containsKey(atlas)) {
+			pbrTextureConsumer.acceptMetalnessTexture(metalnessAtlases.get(atlas));
+			acceptedMetalnessAtlas = true;
 		}
 		int atlasWidth = ((TextureAtlasExtension) atlas).getWidth();
 		int atlasHeight = ((TextureAtlasExtension) atlas).getHeight();
@@ -96,6 +103,15 @@ public class AtlasPBRLoader implements PBRTextureLoader<TextureAtlas> {
 						pbrSpriteHolder.setSpecularSprite(specularSprite);
 					}
 				}
+
+				if (!acceptedMetalnessAtlas) {
+					TextureAtlasSprite metalnessSprite = createPBRSprite(sprite, resourceManager, atlas, atlasWidth, atlasHeight, mipLevel, PBRType.METALNESS);
+					if (metalnessSprite != null) {
+						metalnessAtlases.computeIfAbsent(atlas, (atlas2) -> new PBRAtlasTexture(atlas, PBRType.METALNESS)).addSprite(metalnessSprite);
+						PBRSpriteHolder pbrSpriteHolder = ((TextureAtlasSpriteExtension) sprite.contents()).getOrCreatePBRHolder();
+						pbrSpriteHolder.setMetalnessSprite(metalnessSprite);
+					}
+				}
 			}
 		}
 
@@ -110,6 +126,13 @@ public class AtlasPBRLoader implements PBRTextureLoader<TextureAtlas> {
 			PBRAtlasTexture specularAtlas = specularAtlases.get(atlas);
 			if (specularAtlas.tryUpload(atlasWidth, atlasHeight, mipLevel)) {
 				pbrTextureConsumer.acceptSpecularTexture(specularAtlas);
+			}
+		}
+
+		if (metalnessAtlases.containsKey(atlas)) {
+			PBRAtlasTexture metalnessAtlas = metalnessAtlases.get(atlas);
+			if (metalnessAtlas.tryUpload(atlasWidth, atlasHeight, mipLevel)) {
+				pbrTextureConsumer.acceptMetalnessTexture(metalnessAtlas);
 			}
 		}
 	}
@@ -196,6 +219,8 @@ public class AtlasPBRLoader implements PBRTextureLoader<TextureAtlas> {
 			return normalAtlases.computeIfAbsent(atlas, (atlas2) -> new PBRAtlasTexture(atlas, PBRType.NORMAL));
 		} else if (type == PBRType.SPECULAR) {
 			return specularAtlases.computeIfAbsent(atlas, (atlas2) -> new PBRAtlasTexture(atlas, PBRType.SPECULAR));
+		} else if (type == PBRType.METALNESS) {
+			return metalnessAtlases.computeIfAbsent(atlas, (atlas2) -> new PBRAtlasTexture(atlas, PBRType.METALNESS));
 		} else {
 			throw new IllegalStateException("Unknown PBR Type: " + type);
 		}
