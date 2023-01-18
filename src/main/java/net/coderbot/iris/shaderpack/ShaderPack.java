@@ -42,10 +42,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -69,6 +71,8 @@ public class ShaderPack {
 
 	private final ProfileSet.ProfileResult profile;
 	private final String profileInfo;
+	private final List<ImageInformation> irisCustomImages;
+	private final Set<FeatureFlags> activeFeatures;
 
 	public ShaderPack(Path root, Iterable<StringPair> environmentDefines) throws IOException, IllegalStateException {
 		this(root, Collections.emptyMap(), environmentDefines);
@@ -125,6 +129,22 @@ public class ShaderPack {
 		ShaderProperties shaderProperties = loadProperties(root, "shaders.properties")
 				.map(source -> new ShaderProperties(source, shaderPackOptions, finalEnvironmentDefines))
 				.orElseGet(ShaderProperties::empty);
+
+		activeFeatures = new HashSet<>();
+		for (int i = 0; i < shaderProperties.getRequiredFeatureFlags().size(); i++) {
+			activeFeatures.add(FeatureFlags.getValue(shaderProperties.getRequiredFeatureFlags().get(i)));
+		}
+		for (int i = 0; i < shaderProperties.getOptionalFeatureFlags().size(); i++) {
+			activeFeatures.add(FeatureFlags.getValue(shaderProperties.getOptionalFeatureFlags().get(i)));
+		}
+
+		if (!activeFeatures.contains(FeatureFlags.SSBO) && !shaderProperties.getBufferObjects().isEmpty()) {
+			throw new IllegalStateException("An SSBO is being used, but the feature flag for SSBO's hasn't been set! Please set either a requirement or check for the SSBO feature using \"iris.features.required/optional = ssbo\".");
+		}
+
+		if (!activeFeatures.contains(FeatureFlags.CUSTOM_IMAGES) && !shaderProperties.getIrisCustomImages().isEmpty()) {
+			throw new IllegalStateException("Custom images are being used, but the feature flag for custom images hasn't been set! Please set either a requirement or check for custom images' feature flag using \"iris.features.required/optional = CUSTOM_IMAGES\".");
+		}
 
 		List<FeatureFlags> invalidFlagList = shaderProperties.getRequiredFeatureFlags().stream().filter(FeatureFlags::isInvalid).map(FeatureFlags::getValue).collect(Collectors.toList());
 		List<String> invalidFeatureFlags = invalidFlagList.stream().map(FeatureFlags::getHumanReadableName).collect(Collectors.toList());
@@ -249,6 +269,8 @@ public class ShaderPack {
 
 			customTextureDataMap.put(textureStage, innerCustomTextureDataMap);
 		});
+
+		this.irisCustomImages = shaderProperties.getIrisCustomImages();
 
 		this.customUniforms = shaderProperties.customUniforms;
 
@@ -423,6 +445,10 @@ public class ShaderPack {
 		return customTextureDataMap;
 	}
 
+	public List<ImageInformation> getIrisCustomImages() {
+		return irisCustomImages;
+	}
+
 	public Object2ObjectMap<String, CustomTextureData> getIrisCustomTextureDataMap() {
 		return irisCustomTextureDataMap;
 	}
@@ -442,4 +468,8 @@ public class ShaderPack {
 	public OptionMenuContainer getMenuContainer() {
 		return menuContainer;
 	}
+
+    public boolean hasFeature(FeatureFlags feature) {
+		return activeFeatures.contains(feature);
+    }
 }
