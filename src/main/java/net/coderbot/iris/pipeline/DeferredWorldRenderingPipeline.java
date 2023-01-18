@@ -81,7 +81,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.DimensionSpecialEffects;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.texture.AbstractTexture;
-import net.minecraft.network.chat.TranslatableComponent;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11C;
@@ -1226,7 +1225,6 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 		if (showSSBOError) {
 			showSSBOError = false;
 			if (Minecraft.getInstance().player != null) {
-				Minecraft.getInstance().player.displayClientMessage(new TranslatableComponent("iris.shaders.ssbofailure"), false);
 			}
 		}
 
