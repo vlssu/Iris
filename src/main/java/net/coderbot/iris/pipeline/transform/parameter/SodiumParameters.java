@@ -1,6 +1,7 @@
 package net.coderbot.iris.pipeline.transform.parameter;
 
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
+import net.coderbot.iris.block_rendering.BlockRenderingSettings;
 import net.coderbot.iris.gl.blending.AlphaTest;
 import net.coderbot.iris.gl.texture.TextureType;
 import net.coderbot.iris.helpers.Tri;
@@ -21,6 +22,7 @@ public class SodiumParameters extends Parameters {
 	// DO NOT include this field in hashCode or equals, it's mutable!
 	// (See use of setAlphaFor in TransformPatcher)
 	public AlphaTest alpha;
+	public boolean isSeparateAo;
 
 	public SodiumParameters(Patch patch,
 			Object2ObjectMap<Tri<String, TextureType, TextureStage>, String> textureMap,
@@ -35,6 +37,7 @@ public class SodiumParameters extends Parameters {
 		this.positionScale = positionScale;
 		this.positionOffset = positionOffset;
 		this.textureScale = textureScale;
+		this.isSeparateAo = BlockRenderingSettings.INSTANCE.shouldUseSeparateAo();
 
 		this.alpha = defaultAlpha;
 	}
@@ -71,6 +74,8 @@ public class SodiumParameters extends Parameters {
 		result = prime * result + Float.floatToIntBits(positionScale);
 		result = prime * result + Float.floatToIntBits(positionOffset);
 		result = prime * result + Float.floatToIntBits(textureScale);
+		result = prime * result + ((alpha == null) ? 0 : alpha.hashCode());
+		result = prime * result + ((isSeparateAo) ? 0 : 91);
 		return result;
 	}
 
@@ -103,6 +108,13 @@ public class SodiumParameters extends Parameters {
 		if (Float.floatToIntBits(positionOffset) != Float.floatToIntBits(other.positionOffset))
 			return false;
 		if (Float.floatToIntBits(textureScale) != Float.floatToIntBits(other.textureScale))
+			return false;
+		if (alpha == null) {
+			if (other.alpha != null)
+				return false;
+		} else if (!alpha.equals(other.alpha)) {
+			return false;
+	    } else if (isSeparateAo == other.isSeparateAo)
 			return false;
 		return true;
 	}
