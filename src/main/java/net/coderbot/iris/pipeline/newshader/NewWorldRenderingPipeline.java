@@ -11,6 +11,8 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectMaps;
 import net.coderbot.iris.Iris;
 import net.coderbot.iris.block_rendering.BlockMaterialMapping;
 import net.coderbot.iris.block_rendering.BlockRenderingSettings;
+import net.coderbot.iris.colorspace.ColorSpace;
+import net.coderbot.iris.colorspace.ColorSpaceConverter;
 import net.coderbot.iris.features.FeatureFlags;
 import net.coderbot.iris.gbuffer_overrides.matching.InputAvailability;
 import net.coderbot.iris.gbuffer_overrides.matching.SpecialCondition;
@@ -161,6 +163,7 @@ public class NewWorldRenderingPipeline implements WorldRenderingPipeline, CoreWo
 	private final boolean shouldRenderSun;
 	private final boolean shouldRenderMoon;
 	private final boolean allowConcurrentCompute;
+	private final ColorSpaceConverter colorSpaceConverter;
 
 	@Nullable
 	private final ShadowRenderer shadowRenderer;
@@ -237,6 +240,8 @@ public class NewWorldRenderingPipeline implements WorldRenderingPipeline, CoreWo
 		} else {
 			forcedShadowRenderDistanceChunks = OptionalInt.empty();
 		}
+
+		colorSpaceConverter = new ColorSpaceConverter(main.getColorTextureId(), ColorSpace.DCI_P3, main.width, main.height);
 
 		this.customUniforms = programSet.getPack().customUniforms.build(
 			holder -> CommonUniforms.addNonDynamicUniforms(holder, programSet.getPack().getIdMap(), programSet.getPackDirectives(), this.updateNotifier)
@@ -872,6 +877,7 @@ public class NewWorldRenderingPipeline implements WorldRenderingPipeline, CoreWo
 			main.height, depthBufferFormat, packDirectives);
 
 		if (changed) {
+			colorSpaceConverter.changeMainRenderTarget(main.getColorTextureId(), main.width, main.height);
 			beginRenderer.recalculateSizes();
 			prepareRenderer.recalculateSizes();
 			deferredRenderer.recalculateSizes();
@@ -1024,6 +1030,7 @@ public class NewWorldRenderingPipeline implements WorldRenderingPipeline, CoreWo
 		centerDepthSampler.sampleCenterDepth();
 		compositeRenderer.renderAll();
 		finalPassRenderer.renderFinalPass();
+		colorSpaceConverter.processColorSpace();
 	}
 
 	@Override
