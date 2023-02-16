@@ -2,7 +2,9 @@ package net.coderbot.iris.gui.option;
 
 import com.mojang.serialization.Codec;
 import net.coderbot.iris.Iris;
+import net.coderbot.iris.colorspace.ColorSpace;
 import net.coderbot.iris.pipeline.WorldRenderingPipeline;
+import net.coderbot.iris.pipeline.newshader.NewWorldRenderingPipeline;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.OptionInstance;
 import net.minecraft.client.Options;
@@ -17,6 +19,7 @@ import java.util.List;
 
 public class IrisVideoSettings {
 	public static int shadowDistance = 32;
+	public static ColorSpace colorSpace = ColorSpace.SRGB;
 
 	// TODO: Tell the user to check in the shader options once that's supported.
 	private static final Component DISABLED_TOOLTIP = Component.translatable("options.iris.shadowDistance.disabled");
@@ -33,7 +36,11 @@ public class IrisVideoSettings {
 				.map(pipeline -> !pipeline.getForcedShadowRenderDistanceChunksForDisplay().isPresent())
 				.orElse(true);
 	}
-	// TODO 22w12a fix this
+
+	public static void colorSpaceChanged() {
+		Iris.getPipelineManager().getPipeline()
+				.filter(pipeline -> pipeline instanceof NewWorldRenderingPipeline).ifPresent(pipeline -> ((NewWorldRenderingPipeline) pipeline).colorSpaceConverter.changeCurrentColorSpace(colorSpace));
+	}
 
 	public static final OptionInstance<Integer> RENDER_DISTANCE = new ShadowDistanceOption<>("options.iris.shadowDistance",
 		mc -> {
