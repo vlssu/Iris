@@ -2,6 +2,7 @@ package net.coderbot.iris.gui.option;
 
 import com.mojang.serialization.Codec;
 import net.coderbot.iris.Iris;
+import net.coderbot.iris.colorspace.ColorBlindness;
 import net.coderbot.iris.colorspace.ColorSpace;
 import net.coderbot.iris.pipeline.WorldRenderingPipeline;
 import net.coderbot.iris.pipeline.newshader.NewWorldRenderingPipeline;
@@ -20,6 +21,8 @@ import java.util.List;
 public class IrisVideoSettings {
 	public static int shadowDistance = 32;
 	public static ColorSpace colorSpace = ColorSpace.SRGB;
+	public static ColorBlindness colorBlindness = ColorBlindness.NONE;
+	public static float colorBlindnessIntensity = 1.0f;
 
 	// TODO: Tell the user to check in the shader options once that's supported.
 	private static final Component DISABLED_TOOLTIP = Component.translatable("options.iris.shadowDistance.disabled");
@@ -38,8 +41,11 @@ public class IrisVideoSettings {
 	}
 
 	public static void colorSpaceChanged() {
-		Iris.getPipelineManager().getPipeline()
-				.filter(pipeline -> pipeline instanceof NewWorldRenderingPipeline).ifPresent(pipeline -> ((NewWorldRenderingPipeline) pipeline).colorSpaceConverter.changeCurrentColorSpace(colorSpace));
+		Iris.getPipelineManager().getPipeline().ifPresent(pipeline -> pipeline.getColorSpaceConverter().changeCurrentColorSpace(colorSpace));
+	}
+
+	public static void colorBlindnessChanged() {
+		Iris.getPipelineManager().getPipeline().ifPresent(pipeline -> pipeline.getColorSpaceConverter().changeCurrentColorBlindness(colorBlindness, colorBlindnessIntensity));
 	}
 
 	public static final OptionInstance<Integer> RENDER_DISTANCE = new ShadowDistanceOption<>("options.iris.shadowDistance",
