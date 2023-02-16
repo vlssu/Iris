@@ -163,7 +163,7 @@ public class NewWorldRenderingPipeline implements WorldRenderingPipeline, CoreWo
 	private final boolean shouldRenderSun;
 	private final boolean shouldRenderMoon;
 	private final boolean allowConcurrentCompute;
-	private final ColorSpaceConverter colorSpaceConverter;
+	public final ColorSpaceConverter colorSpaceConverter;
 
 	@Nullable
 	private final ShadowRenderer shadowRenderer;
