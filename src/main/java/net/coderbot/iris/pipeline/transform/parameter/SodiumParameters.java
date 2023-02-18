@@ -10,7 +10,7 @@ import net.coderbot.iris.pipeline.transform.Patch;
 import net.coderbot.iris.pipeline.transform.PatchShaderType;
 import net.coderbot.iris.shaderpack.texture.TextureStage;
 
-public class SodiumParameters extends Parameters {
+public class SodiumParameters extends GeometryInfoParameters {
 	private final AlphaTest cutoutAlpha;
 	private final AlphaTest defaultAlpha;
 	public final ShaderAttributeInputs inputs;
@@ -24,13 +24,13 @@ public class SodiumParameters extends Parameters {
 	public AlphaTest alpha;
 	public boolean isSeparateAo;
 
-	public SodiumParameters(Patch patch,
+	public SodiumParameters(Patch patch, boolean hasGeometry,
 			Object2ObjectMap<Tri<String, TextureType, TextureStage>, String> textureMap,
 			AlphaTest cutoutAlpha,
 			AlphaTest defaultAlpha,
 			ShaderAttributeInputs inputs,
 			float positionScale, float positionOffset, float textureScale) {
-		super(patch, textureMap);
+		super(patch, textureMap, hasGeometry);
 		this.cutoutAlpha = cutoutAlpha;
 		this.defaultAlpha = defaultAlpha;
 		this.inputs = inputs;

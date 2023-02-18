@@ -52,6 +52,7 @@
     "vertex_format.MixinRenderSectionManager",
     "vertex_format.MixinCommonVertexElements",
     "vertex_format.CommonVertexElementAccessor",
+    "vertex_format.MixinVertexElementType",
     "vertex_format.MixinVertexSerializerCache",
     "vertex_format.MixinSpriteCoordinateExpander"
   ]

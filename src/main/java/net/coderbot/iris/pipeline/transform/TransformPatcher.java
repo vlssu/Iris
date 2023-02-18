@@ -369,7 +369,7 @@ public class TransformPatcher {
 			float positionScale, float positionOffset, float textureScale,
 			Object2ObjectMap<Tri<String, TextureType, TextureStage>, String> textureMap) {
 		return transform(vertex, geometry, fragment,
-				new SodiumParameters(Patch.SODIUM, textureMap, cutoutAlpha, defaultAlpha, inputs, positionScale, positionOffset,
+				new SodiumParameters(Patch.SODIUM, geometry != null, textureMap, cutoutAlpha, defaultAlpha, inputs, positionScale, positionOffset,
 						textureScale));
 	}
 

@@ -6,6 +6,7 @@ import io.github.douira.glsl_transformer.ast.transform.ASTInjectionPoint;
 import io.github.douira.glsl_transformer.ast.transform.ASTParser;
 import net.coderbot.iris.gl.shader.ShaderType;
 import net.coderbot.iris.pipeline.transform.PatchShaderType;
+import net.coderbot.iris.pipeline.transform.parameter.GeometryInfoParameters;
 import net.coderbot.iris.pipeline.transform.parameter.SodiumParameters;
 
 public class SodiumTransformer {
@@ -14,7 +15,7 @@ public class SodiumTransformer {
 			TranslationUnit tree,
 			Root root,
 			SodiumParameters parameters) {
-		CommonTransformer.transform(t, tree, root, parameters, "iris_alphaTestValue");
+		CommonTransformer.transform(t, tree, root, parameters, (parameters.hasGeometry ? "iris_alphaTestValueGS" : "iris_alphaTestValue"));
 
 		root.replaceExpressionMatches(t, CommonTransformer.glTextureMatrix0, "mat4(1.0)");
 		root.replaceExpressionMatches(t, CommonTransformer.glTextureMatrix1, "iris_LightmapTextureMatrix");
@@ -137,9 +138,16 @@ public class SodiumTransformer {
 					"uniform mat4 iris_ProjectionMatrix;");
 		}
 
-		if (parameters.type == PatchShaderType.FRAGMENT_CUTOUT || parameters.type == PatchShaderType.FRAGMENT) {
+		if (parameters.type == PatchShaderType.GEOMETRY) {
 			tree.parseAndInjectNodes(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-				"in float iris_alphaTestValue;");
+				"in float iris_alphaTestValue[];",
+				"out float iris_alphaTestValueGS;",
+				"void _geom_init() { iris_alphaTestValueGS = iris_alphaTestValue[0]; }");
+			tree.prependMainFunctionBody(t, "_geom_init();");
+		} else if (parameters.type == PatchShaderType.FRAGMENT_CUTOUT || parameters.type == PatchShaderType.FRAGMENT) {
+			boolean hasGeometry = parameters.hasGeometry;
+			tree.parseAndInjectNodes(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+				"in float " + (hasGeometry ? "iris_alphaTestValueGS" : "iris_alphaTestValue") + ";");
 		}
 
 		root.replaceReferenceExpressions(t, "gl_ModelViewProjectionMatrix",

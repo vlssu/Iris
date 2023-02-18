@@ -3,7 +3,11 @@ package net.coderbot.iris.compat.sodium.mixin.vertex_format;
 import net.caffeinemc.mods.sodium.api.vertex.attributes.CommonVertexAttribute;
 import net.caffeinemc.mods.sodium.api.vertex.attributes.common.TextureAttribute;
 import net.caffeinemc.mods.sodium.api.vertex.format.VertexFormatDescription;
+import net.coderbot.iris.Iris;
 import net.coderbot.iris.compat.sodium.impl.vertex_format.IrisVertexElementTypes;
+import net.coderbot.iris.compat.sodium.impl.vertex_format.entity_xhfp.EntityVertex;
+import net.coderbot.iris.compat.sodium.impl.vertex_format.entity_xhfp.GlyphVertexExt;
+import net.coderbot.iris.vertices.IrisVertexFormats;
 import net.minecraft.client.renderer.SpriteCoordinateExpander;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
@@ -26,11 +30,8 @@ public class MixinSpriteCoordinateExpander {
 		float w = maxU - minU;
 		float h = maxV - minV;
 
-		boolean hasMidTexCoord = format.containsElement(IrisVertexElementTypes.MID_TEX_COORD);
-		long offsetMidUV = 0;
-		if (hasMidTexCoord) {
-			offsetMidUV = format.getElementOffset(IrisVertexElementTypes.MID_TEX_COORD);
-		}
+		boolean hasMidTexCoord = format == EntityVertex.FORMAT || format == GlyphVertexExt.FORMAT;
+		long offsetMidUV = 36;
 
 		for (int vertexIndex = 0; vertexIndex < count; vertexIndex++) {
 			// The texture coordinates relative to the sprite bounds
