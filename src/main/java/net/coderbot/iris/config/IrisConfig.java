@@ -140,7 +140,7 @@ public class IrisConfig {
 		disableUpdateMessage = "true".equals(properties.getProperty("disableUpdateMessage"));
 		try {
 			IrisVideoSettings.shadowDistance = Integer.parseInt(properties.getProperty("maxShadowRenderDistance", "32"));
-			IrisVideoSettings.colorSpace = ColorSpace.valueOf(properties.getProperty("maxShadowRenderDistance", "SRGB"));
+			IrisVideoSettings.colorSpace = ColorSpace.valueOf(properties.getProperty("colorSpace", "SRGB"));
 		} catch (NumberFormatException e) {
 			Iris.logger.error("Shadow distance setting reset; value is invalid.");
 			IrisVideoSettings.shadowDistance = 32;
