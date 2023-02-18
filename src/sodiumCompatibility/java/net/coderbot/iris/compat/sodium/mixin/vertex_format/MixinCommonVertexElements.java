@@ -2,8 +2,7 @@ package net.coderbot.iris.compat.sodium.mixin.vertex_format;
 
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormatElement;
-import me.jellysquid.mods.sodium.client.render.chunk.format.ChunkMeshAttribute;
-import me.jellysquid.mods.sodium.client.render.vertex.transform.CommonVertexElement;
+import net.caffeinemc.mods.sodium.api.vertex.attributes.CommonVertexAttribute;
 import net.coderbot.iris.compat.sodium.impl.vertex_format.IrisCommonVertexElements;
 import net.coderbot.iris.compat.sodium.impl.vertex_format.IrisCommonVertexElements;
 import net.coderbot.iris.vertices.IrisVertexFormats;
@@ -15,18 +14,18 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 
 /**
- * Uses some rather hacky shenanigans to add a few new enum values to {@link ChunkMeshAttribute} corresponding to our
+ * Uses some rather hacky shenanigans to add a few new enum values to {@link CommonVertexAttribute} corresponding to our
  * extended vertex attributes.
  *
  * Credit goes to Nuclearfarts for the trick.
  */
-@Mixin(CommonVertexElement.class)
+@Mixin(CommonVertexAttribute.class)
 public class MixinCommonVertexElements {
 	@SuppressWarnings("target")
 	@Shadow(remap = false)
 	@Final
 	@Mutable
-	private static CommonVertexElement[] $VALUES;
+	private static CommonVertexAttribute[] $VALUES;
 
 	@Mutable
 	@Shadow
@@ -37,13 +36,13 @@ public class MixinCommonVertexElements {
 		int baseOrdinal = $VALUES.length;
 
 		IrisCommonVertexElements.TANGENT
-				= CommonVertexElementAccessor.createCommonVertexElement("TANGENT", baseOrdinal);
+				= CommonVertexElementAccessor.createCommonVertexElement("TANGENT", baseOrdinal, IrisVertexFormats.TANGENT_ELEMENT);
 		IrisCommonVertexElements.MID_TEX_COORD
-				= CommonVertexElementAccessor.createCommonVertexElement("MID_TEX_COORD", baseOrdinal + 1);
+				= CommonVertexElementAccessor.createCommonVertexElement("MID_TEX_COORD", baseOrdinal + 1, IrisVertexFormats.MID_TEXTURE_ELEMENT);
 		IrisCommonVertexElements.BLOCK_ID
-				= CommonVertexElementAccessor.createCommonVertexElement("BLOCK_ID", baseOrdinal + 2);
+				= CommonVertexElementAccessor.createCommonVertexElement("BLOCK_ID", baseOrdinal + 2, IrisVertexFormats.ENTITY_ELEMENT);
 		IrisCommonVertexElements.MID_BLOCK
-				= CommonVertexElementAccessor.createCommonVertexElement("MID_BLOCK", baseOrdinal + 3);
+				= CommonVertexElementAccessor.createCommonVertexElement("MID_BLOCK", baseOrdinal + 3, IrisVertexFormats.MID_BLOCK_ELEMENT);
 
 		$VALUES = ArrayUtils.addAll($VALUES,
 				IrisCommonVertexElements.TANGENT,
@@ -52,34 +51,5 @@ public class MixinCommonVertexElements {
 				IrisCommonVertexElements.MID_BLOCK);
 
 		COUNT = $VALUES.length;
-	}
-
-	/**
-	 * @author IMS
-	 * @reason Add more elements
-	 */
-	@Overwrite(remap = false)
-	public static CommonVertexElement getCommonType(VertexFormatElement element) {
-		if (element == DefaultVertexFormat.ELEMENT_POSITION) {
-			return CommonVertexElement.POSITION;
-		} else if (element == DefaultVertexFormat.ELEMENT_COLOR) {
-			return CommonVertexElement.COLOR;
-		} else if (element == DefaultVertexFormat.ELEMENT_UV0) {
-			return CommonVertexElement.TEXTURE;
-		} else if (element == DefaultVertexFormat.ELEMENT_UV1) {
-			return CommonVertexElement.OVERLAY;
-		} else if (element == DefaultVertexFormat.ELEMENT_UV2) {
-			return CommonVertexElement.LIGHT;
-		} else if (element == IrisVertexFormats.ENTITY_ELEMENT) {
-			return IrisCommonVertexElements.BLOCK_ID;
-		} else if (element == IrisVertexFormats.MID_BLOCK_ELEMENT) {
-			return IrisCommonVertexElements.MID_BLOCK;
-		} else if (element == IrisVertexFormats.TANGENT_ELEMENT) {
-			return IrisCommonVertexElements.TANGENT;
-		} else if (element == IrisVertexFormats.MID_TEXTURE_ELEMENT) {
-			return IrisCommonVertexElements.MID_TEX_COORD;
-		} else {
-			return element == DefaultVertexFormat.ELEMENT_NORMAL ? CommonVertexElement.NORMAL : null;
-		}
 	}
 }

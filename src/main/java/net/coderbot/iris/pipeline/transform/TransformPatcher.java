@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import net.coderbot.iris.pipeline.transform.parameter.TextureStageParameters;
 import org.antlr.v4.runtime.RecognitionException;
 import org.antlr.v4.runtime.Token;
 import org.apache.logging.log4j.LogManager;
@@ -31,7 +32,6 @@ import net.coderbot.iris.helpers.Tri;
 import net.coderbot.iris.pipeline.PatchedShaderPrinter;
 import net.coderbot.iris.pipeline.newshader.ShaderAttributeInputs;
 import net.coderbot.iris.pipeline.transform.parameter.AttributeParameters;
-import net.coderbot.iris.pipeline.transform.parameter.CompositeParameters;
 import net.coderbot.iris.pipeline.transform.parameter.ComputeParameters;
 import net.coderbot.iris.pipeline.transform.parameter.Parameters;
 import net.coderbot.iris.pipeline.transform.parameter.SodiumParameters;
@@ -216,7 +216,7 @@ public class TransformPatcher {
 							// we can assume the version is at least 400 because it's a compute shader
 							versionStatement.profile = Profile.CORE;
 							CommonTransformer.transform(transformer, tree, root, parameters, null);
-							TextureTransformer.transform(transformer, tree, root, ((ComputeParameters) parameters).getStage(), ((ComputeParameters) parameters).getTextureMap());
+							TextureTransformer.transform(transformer, tree, root, ((ComputeParameters) parameters).getTextureStage(), ((ComputeParameters) parameters).getTextureMap());
 							break;
 						default:
 							// TODO: Implement Optifine's special core profile mode
@@ -225,13 +225,9 @@ public class TransformPatcher {
 									throw new IllegalStateException(
 											"Vertex shaders with existing core profile found, aborting this part of patching. (Compatibility patches are applied nonetheless) See debugging.md for more information.");
 								} else {
-									if (parameters instanceof CompositeParameters compositeParameters) {
-										TextureTransformer.transform(transformer, tree, root,
-											compositeParameters.stage,
-											compositeParameters.getTextureMap());
-									} else {
-										TextureTransformer.transform(transformer, tree, root, TextureStage.GBUFFERS_AND_SHADOW, parameters instanceof SodiumParameters parameters1 ? parameters1.getTextureMap() : ((VanillaParameters) parameters).getTextureMap());
-									}
+									TextureTransformer.transform(transformer, tree, root,
+										parameters.getTextureStage(),
+										parameters.getTextureMap());
 									break;
 								}
 							}
@@ -248,10 +244,10 @@ public class TransformPatcher {
 							}
 							switch (parameters.patch) {
 								case COMPOSITE:
-									CompositeParameters compositeParameters = (CompositeParameters) parameters;
+									TextureStageParameters compositeParameters = (TextureStageParameters) parameters;
 									CompositeTransformer.transform(transformer, tree, root, parameters);
 									TextureTransformer.transform(transformer, tree, root,
-											compositeParameters.stage,
+											compositeParameters.getTextureStage(),
 											compositeParameters.getTextureMap());
 									break;
 								case SODIUM:
@@ -357,7 +353,7 @@ public class TransformPatcher {
 	public static Map<PatchShaderType, String> patchAttributes(String vertex, String geometry, String fragment,
 			InputAvailability inputs, Object2ObjectMap<Tri<String, TextureType, TextureStage>, String> textureMap) {
 		return transform(vertex, geometry, fragment,
-				new AttributeParameters(Patch.ATTRIBUTES, geometry != null, inputs, textureMap));
+				new AttributeParameters(Patch.ATTRIBUTES, textureMap, geometry != null, inputs));
 	}
 
 	public static Map<PatchShaderType, String> patchVanilla(
@@ -365,7 +361,7 @@ public class TransformPatcher {
 			boolean hasChunkOffset, ShaderAttributeInputs inputs,
 			Object2ObjectMap<Tri<String, TextureType, TextureStage>, String> textureMap) {
 		return transform(vertex, geometry, fragment,
-				new VanillaParameters(Patch.VANILLA, alpha, hasChunkOffset, inputs, geometry != null, textureMap));
+				new VanillaParameters(Patch.VANILLA, textureMap, alpha, hasChunkOffset, inputs, geometry != null));
 	}
 
 	public static Map<PatchShaderType, String> patchSodium(String vertex, String geometry, String fragment,
@@ -373,13 +369,13 @@ public class TransformPatcher {
 			float positionScale, float positionOffset, float textureScale,
 			Object2ObjectMap<Tri<String, TextureType, TextureStage>, String> textureMap) {
 		return transform(vertex, geometry, fragment,
-				new SodiumParameters(Patch.SODIUM, cutoutAlpha, defaultAlpha, inputs, positionScale, positionOffset,
-						textureScale, textureMap));
+				new SodiumParameters(Patch.SODIUM, textureMap, cutoutAlpha, defaultAlpha, inputs, positionScale, positionOffset,
+						textureScale));
 	}
 
 	public static Map<PatchShaderType, String> patchComposite(String vertex, String geometry, String fragment,
 			TextureStage stage, Object2ObjectMap<Tri<String, TextureType, TextureStage>, String> textureMap) {
-		return transform(vertex, geometry, fragment, new CompositeParameters(Patch.COMPOSITE, stage, textureMap));
+		return transform(vertex, geometry, fragment, new TextureStageParameters(Patch.COMPOSITE, stage, textureMap));
 	}
 
 	public static String patchCompute(String compute, TextureStage stage, Object2ObjectMap<Tri<String, TextureType, TextureStage>, String> textureMap) {
