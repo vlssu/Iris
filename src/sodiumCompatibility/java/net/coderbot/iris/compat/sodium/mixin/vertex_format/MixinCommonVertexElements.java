@@ -59,7 +59,5 @@ public abstract class MixinCommonVertexElements {
 				IrisCommonVertexElements.MID_BLOCK);
 
 		COUNT = $VALUES.length;
-
-		Iris.logger.warn(Arrays.toString(values()));
 	}
 }
