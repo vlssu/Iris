@@ -9,14 +9,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(targets = "net.minecraft.client.gui.Font$StringRenderOutput")
 public class MixinFont {
-	@Inject(method = "accept", at = @At("HEAD"))
+	@Inject(method = "accept", at = @At("HEAD"), remap = false)
 	private void iris$beforeFlushBuffer(int pFont$StringRenderOutput0, Style pStyle1, int pInt2, CallbackInfoReturnable<Boolean> cir) {
 		if (iris$notRenderingLevel()) {
 			ImmediateState.renderWithExtendedVertexFormat = false;
 		}
 	}
 
-	@Inject(method = "accept", at = @At("TAIL"))
+	@Inject(method = "accept", at = @At("TAIL"), remap = false)
 	private void iris$afterFlushBuffer(int pFont$StringRenderOutput0, Style pStyle1, int pInt2, CallbackInfoReturnable<Boolean> cir) {
 		if (iris$notRenderingLevel()) {
 			ImmediateState.renderWithExtendedVertexFormat = true;

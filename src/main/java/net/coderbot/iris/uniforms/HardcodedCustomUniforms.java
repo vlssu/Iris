@@ -126,11 +126,7 @@ public class HardcodedCustomUniforms {
 
 		Vec3 feet = client.cameraEntity.position();
 		Vec3 eyes = new Vec3(feet.x, client.cameraEntity.getEyeY(), feet.z);
-		BlockPos eyeBlockPos = new BlockPos(eyes);
-
-		int skyLight = client.level.getBrightness(LightLayer.SKY, eyeBlockPos);
-
-		return skyLight * 16;
+		return 0;
 	}
 
 	private static float getVelocity(CameraUniforms.CameraPositionTracker tracker) {

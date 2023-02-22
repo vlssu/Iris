@@ -12,8 +12,4 @@ public class MixinSharedConstants_LazyDfu {
 	 * @author Andrew Steinborn (LazyDFU)
 	 * @reason Disables any possibility of enabling DFU "optimizations"
 	 */
-	@Overwrite
-	public static void enableDataFixerOptimizations() {
-		LogUtils.getLogger().info("[Iris] Applying LazuDFU optimization since this is a development environment");
-	}
 }
