@@ -13,7 +13,7 @@ public class SodiumVersionCheck {
 	// of pain. So don't forget!
 	private static final ImmutableList<AllowedSodiumVersion> ALLOWED_SODIUM_VERSIONS = ImmutableList.of(
 			// Dev version
-			AllowedSodiumVersion.exact("0.4.10+build.1374",
+			AllowedSodiumVersion.exact("0.4.10+build.1379",
 					"https://modrinth.com/mod/sodium/version/mc23w07a-0.4.10")
 	);
 
