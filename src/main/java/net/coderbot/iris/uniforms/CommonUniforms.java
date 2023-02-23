@@ -17,6 +17,7 @@ import net.coderbot.iris.texture.TextureInfoCache.TextureInfo;
 import net.coderbot.iris.texture.TextureTracker;
 import net.coderbot.iris.uniforms.transforms.SmoothedFloat;
 import net.coderbot.iris.uniforms.transforms.SmoothedVec2f;
+import net.minecraft.core.Vec3i;
 import org.joml.Math;
 import org.joml.Vector2f;
 import org.joml.Vector2i;
@@ -265,8 +266,7 @@ public final class CommonUniforms {
 		}
 
 		Vec3 feet = client.cameraEntity.position();
-		Vec3 eyes = new Vec3(feet.x, client.cameraEntity.getEyeY(), feet.z);
-		BlockPos eyeBlockPos = new BlockPos(eyes);
+		BlockPos eyeBlockPos = new BlockPos((int) feet.x, (int) client.cameraEntity.getEyeY(), (int) feet.z);
 
 		int blockLight = client.level.getBrightness(LightLayer.BLOCK, eyeBlockPos);
 		int skyLight = client.level.getBrightness(LightLayer.SKY, eyeBlockPos);
